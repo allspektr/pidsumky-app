@@ -36,7 +36,7 @@ h1,h2{font-family:var(--f-d);margin:0;letter-spacing:-.01em} h1{font-size:20px} 
 .item.no .box{border-color:var(--bad);color:var(--bad)}
 .item .t{font-weight:800} .item .s{font-size:12.5px;color:var(--muted)}
 .item[disabled]{cursor:default} button.item:not([disabled]){cursor:pointer}
-.pick{display:flex;gap:6px;margin-top:8px}.pick button{font:700 13px var(--f-b);border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:8px 12px}.pick button:disabled{opacity:.75}.pick button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.rw{display:inline-block;margin-left:8px;padding:2px 8px;border-radius:999px;background:var(--accent);color:var(--accent-ink);font:700 12px var(--f-b);vertical-align:2px}.pick{display:flex;gap:6px;margin-top:8px}.pick button{font:700 13px var(--f-b);border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:8px 12px}.pick button:disabled{opacity:.75}.pick button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .cta{font:800 15px var(--f-b);border:0;border-radius:14px;padding:14px;background:var(--accent);color:var(--accent-ink);width:100%}
 .lines .l{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line);font-size:14px}
 .lines .l:last-child{border:0} .lines .v{font-family:var(--f-m)}
@@ -107,22 +107,27 @@ function goalCard(k) {
   <div class="bar"><i style="width:${pct}%"></i>${marks.map(v=>`<s style="left:${v/p.goal*100}%"></s>`).join('')}</div>
   <div class="row muted" style="font-size:13px"><span>${Math.round(pct)}%</span><span>${eta}</span></div></section>`;
 }
+// винагорода за один виконаний день звички = вага × ставка (як у боті)
+const RATE = {vlad: 10, svyat: 8};
+const WEIGHT = {vlad: {wake: 2.5}, svyat: {wake: 2.5, study: 2, screen: 2}};
+const reward = (kid, h) => Math.round((RATE[kid]||0) * ((WEIGHT[kid]||{})[h] || 1));
 function itemsHTML(k, mode) { // mode: 'kid' | 'parent' | 'view'
   const view = mode==='view', dis = view ? ' disabled' : '';
   if (view) mode = 'kid'; // прев'ю = рівно те, що бачить дитина, але кнопки неактивні
   return k.items.map(it0 => {
-    const it = view ? {...it0, can: true} : it0;
+    const it = view ? {...it0, can: it0.type==='self' || it0.type==='screen' || (it0.type==='auto' && it0.done===null) || (it0.type==='timed' && it0.done!==true)} : it0;
     const cls = it.done === true ? 'ok' : it.done === false ? 'no' : '';
     const mark = it.done === true ? '✓' : it.done === false ? '✕' : (ICON[it.type] || '');
     const by = mode==='parent' && it.by ? ' · відмітив '+it.by : '';
     const pick = (act) => `<span class="pick"><button data-act="${act}" data-h="${it.k}" data-v="1" aria-pressed="${it.done===true}"${dis}>✅ Виконав</button><button data-act="${act}" data-h="${it.k}" data-v="0" aria-pressed="${it.done===false}"${dis}>❌ Не виконав</button></span>`;
-    if (it.can && ((mode==='kid' && it.type==='self') || (mode==='parent' && it.type!=='screen'))) return `<div class="item ${cls}"><span class="box">${mark}</span><span><span class="t">${esc(it.t)}</span><br><span class="s">${esc(it.status)}${by}${it.done===null?' · ще не відмічено':''}</span>${pick(mode==='kid'?'set':'pset')}</span></div>`;
-    if (mode==='kid' && it.can && it.type === 'screen') return `<div class="item ${cls}"><span class="box">${mark}</span><span><span class="t">${esc(it.t)}</span><br><span class="s">${esc(it.status)}</span><span class="pick"><button data-act="screen" data-v="1" aria-pressed="${it.done===true}"${dis}>✅ Вклався</button><button data-act="screen" data-v="0" aria-pressed="${it.done===false}"${dis}>❌ Ні</button></span></span></div>`;
+    if (it.can && ((mode==='kid' && it.type==='self') || (mode==='parent' && it.type!=='screen'))) return `<div class="item ${cls}"><span class="box">${mark}</span><span><span class="t">${esc(it.t)}</span><span class="rw">+${reward(k.kid, it.k)} ₴</span><br><span class="s">${esc(it.status)}${by}${it.done===null?' · ще не відмічено':''}</span>${pick(mode==='kid'?'set':'pset')}</span></div>`;
+    if (mode==='kid' && it.can && it.type === 'screen') return `<div class="item ${cls}"><span class="box">${mark}</span><span><span class="t">${esc(it.t)}</span><span class="rw">+${reward(k.kid, it.k)} ₴</span><br><span class="s">${esc(it.status)}</span><span class="pick"><button data-act="screen" data-v="1" aria-pressed="${it.done===true}"${dis}>✅ Вклався</button><button data-act="screen" data-v="0" aria-pressed="${it.done===false}"${dis}>❌ Ні</button></span></span></div>`;
+    if (mode==='kid' && it.can && it.type === 'timed') return `<div class="item ${cls}"><span class="box">${mark}</span><span><span class="t">${esc(it.t)}</span><span class="rw">+${reward(k.kid, it.k)} ₴</span><br><span class="s">${esc(it.status)}</span><span class="pick"><button data-act="hw" data-v="1" aria-pressed="false"${dis}>✅ Зробив</button><button data-act="hw" data-v="0" aria-pressed="${it.done===false}"${dis}>❌ Не зробив</button></span></span></div>`;
     let act = '';
     if (it.can && mode==='kid' && !view) act = it.type==='self' ? `data-act="toggle" data-h="${it.k}"` : it.type==='auto' ? 'data-act="wake"' : it.type==='timed' ? 'data-act="hw"' : '';
     if (it.can && mode==='parent') act = `data-act="ptoggle" data-h="${it.k}"`;
     const verb = mode==='kid' && it.can && it.type==='auto' ? ' · натисни, як прокинувся' : mode==='kid' && it.can && it.type==='timed' ? ' · натисни, як закінчиш' : mode==='parent' && it.type==='screen' ? ' · оцінює сам' : '';
-    return `<button class="item ${cls}" ${act || 'disabled'}><span class="box">${mark}</span><span><span class="t">${esc(it.t)}</span><br><span class="s">${esc(it.status)}${by}${verb}</span></span></button>`;
+    return `<button class="item ${cls}" ${act || 'disabled'}><span class="box">${mark}</span><span><span class="t">${esc(it.t)}</span><span class="rw">+${reward(k.kid, it.k)} ₴</span><br><span class="s">${esc(it.status)}${by}${verb}</span></span></button>`;
   }).join('');
 }
 function streakHTML(w) {
@@ -133,7 +138,8 @@ function weekCard(k) {
   return `<section class="card"><div class="lbl">Цього тижня</div><div class="row"><span class="big">${uah(w.total)}</span><span class="muted">з ${uah(w.max)}</span></div>
   ${streakHTML(w)}
   <div class="muted" style="font-size:13px">${w.clean?`Пропусків ${w.misses} з 2 дозволених: серійний бонус поки твій 🔥`:`Пропусків ${w.misses}: серійний бонус цього тижня згорів`}</div>
-  <div class="wk">${w.rows.map(r=>`<span>${esc(r.t)}</span><span class="v ${r.done===r.sch?'full':''}">${r.done}/${r.sch}</span>`).join('')}</div></section>`;
+  <div class="wk">${w.rows.map(r=>`<span>${esc(r.t)}</span><span class="v ${r.done===r.sch?'full':''}">${r.done}/${r.sch}</span>`).join('')}</div>
+  <div class="muted" style="font-size:13px;margin-top:10px;line-height:1.5"><b>Як складається сума</b><br>🛡 ${uah(w.parts.base)} гарантовано щотижня<br>✅ за кожен виконаний пункт: сума біля нього<br>⭐ +15 ₴ за звичку без жодного пропуску за тиждень<br>🔥 серійний бонус: +${w.streak.join(' / +')} ₴ (росте, якщо тижні без пропусків ідуть поспіль)<br>✨ +50 ₴ дізнався нове · +50 ₴ спробував нове · +50 ₴ за книжку<br>👍 до +50 ₴ похвала від мами і до +50 ₴ від тата</div></section>`;
 }
 function kidHTML(k, mode) {
   const yday = addD(k.today, -1);
@@ -178,7 +184,7 @@ document.addEventListener('click', e => {
   if (a==='day') { date = v; call('app_state'); }
   if (a==='set') call('app_toggle', {habit:b.dataset.h, ok: v==='1'});
   if (a==='wake') call('app_wake');
-  if (a==='hw') call('app_hw');
+  if (a==='hw') call('app_hw', {ok: v!=='0'});
   if (a==='screen') call('app_screen', {ok: v==='1'});
   if (a==='pkid') { pkid = v; preview = false; pamt = null; call('app_state'); }
   if (a==='pday') { date = v; call('app_state'); }
