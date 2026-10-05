@@ -91,7 +91,7 @@ async function call(action, extra={}) {
     const r = await fetch(API, {method:'POST', headers:{'content-type':'application/json','x-tg-init-data':tg.initData}, body:JSON.stringify({action, date, kid:pkid, ...extra})});
     const j = await r.json();
     if (!r.ok) { render({error: j.error==='not_member' ? 'Спершу підключіться до бота за посиланням-запрошенням.' : 'Не вдалося завантажити. Спробуйте ще раз.'}); return; }
-    state = j; if (!date) date = j.role==='parent' ? j.detail.date : j.today; render(j);
+    state = j; if (!date) date = j.role==='parent' ? j.detail.date : j.date; // до 05:00 сервер віддає вчорашній вечір render(j);
   } catch(e) { render({error:'Немає звʼязку із сервером. Перевірте інтернет.'}); }
   finally { busy = false; }
 }
