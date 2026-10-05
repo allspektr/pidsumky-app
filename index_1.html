@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Підсумки</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;700&family=Manrope:wght@500;600;700;800&family=JetBrains+Mono:wght@600&display=swap">
+<style>
+:root{
+  --bg:var(--tg-theme-secondary-bg-color,#EEF3F1); --card:var(--tg-theme-bg-color,#fff); --ink:var(--tg-theme-text-color,#13201B);
+  --muted:var(--tg-theme-hint-color,#5C6E67); --accent:var(--tg-theme-button-color,#0B7F62); --accent-ink:var(--tg-theme-button-text-color,#fff);
+  --line:color-mix(in srgb,var(--muted) 22%,transparent); --soft:color-mix(in srgb,var(--accent) 14%,transparent);
+  --coin:#C98A00; --coin-soft:color-mix(in srgb,#E0A21B 18%,transparent); --bad:#C2462F;
+  --f-d:"Unbounded","Manrope",system-ui,sans-serif; --f-b:"Manrope",system-ui,-apple-system,sans-serif; --f-m:"JetBrains Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box} html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-b);padding:12px 16px calc(28px + env(safe-area-inset-bottom,0px))}
+.wrap{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+h1,h2{font-family:var(--f-d);margin:0;letter-spacing:-.01em} h1{font-size:20px} h2{font-size:15px}
+.card{background:var(--card);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:800}
+.num{font-family:var(--f-m);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)} .row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.bar{height:14px;border-radius:7px;background:var(--line);overflow:hidden;position:relative}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:7px;transition:width .6s}
+.bar s{position:absolute;top:0;bottom:0;width:2px;background:var(--card)}
+.big{font-family:var(--f-d);font-size:30px;color:var(--coin)}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--card);border-radius:14px;padding:4px;gap:4px}
+.seg button{font:700 14px var(--f-b);border:0;border-radius:10px;padding:10px;background:none;color:var(--muted)}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
+.item{display:grid;grid-template-columns:44px 1fr;gap:12px;align-items:center;padding:12px;border-radius:14px;background:var(--bg);border:0;text-align:left;font:inherit;color:inherit;width:100%}
+.item .box{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:20px;background:var(--card);border:2px solid var(--line)}
+.item.ok .box{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.item.no .box{border-color:var(--bad);color:var(--bad)}
+.item .t{font-weight:800} .item .s{font-size:12.5px;color:var(--muted)}
+.item[disabled]{cursor:default} button.item:not([disabled]){cursor:pointer}
+.pick{display:flex;gap:6px;margin-top:8px}.pick button{font:700 13px var(--f-b);border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:8px 12px}.pick button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.cta{font:800 15px var(--f-b);border:0;border-radius:14px;padding:14px;background:var(--accent);color:var(--accent-ink);width:100%}
+.lines .l{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.lines .l:last-child{border:0} .lines .v{font-family:var(--f-m)}
+.streak{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.streak div{border-radius:12px;padding:8px;text-align:center;background:var(--bg);font-size:11px;color:var(--muted)}
+.streak div b{display:block;font-family:var(--f-m);color:var(--coin);font-size:13px}
+.streak div.on{background:var(--coin-soft)}
+.wk{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:14px} .wk .v{font-family:var(--f-m);text-align:right}
+.full{color:var(--coin);font-weight:800}
+.empty{padding:24px;text-align:center;color:var(--muted)}
+.kidsw{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kidsw button{font:inherit;color:inherit;text-align:left;border:2px solid transparent;background:var(--card);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:2px}
+.kidsw button[aria-pressed=true]{border-color:var(--accent)}
+.kidsw b{font-family:var(--f-d);font-size:16px} .kidsw span{font-size:12.5px;color:var(--muted)}
+.days{display:grid;grid-template-columns:24px repeat(7,1fr) 24px;gap:4px;align-items:center}
+.days button{font:inherit;color:inherit;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:6px 0;display:flex;flex-direction:column;align-items:center;gap:1px;font-size:12px;font-weight:700;min-width:0}
+.days button.arrow{border:0;background:none;font-size:18px;color:var(--muted)}
+.days button[aria-pressed=true]{border-color:var(--accent);background:var(--soft)}
+.days button:disabled{opacity:.35}
+.days small{font-family:var(--f-m);font-size:10px;color:var(--muted)}
+.days .full small{color:var(--accent)}
+.note{background:var(--soft);color:var(--ink);border-radius:12px;padding:10px 12px;font-size:14px;font-weight:700}
+.nrow{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line)}
+.nrow:last-child{border:0}.nrow .tx{min-width:0;overflow-wrap:anywhere;font-size:14px}
+.nrow .k{display:block;font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+input.why{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;width:100%}
+.ghost{font:700 14px var(--f-b);border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:14px;padding:12px;width:100%}
+.banner{background:var(--coin-soft);border-radius:14px;padding:10px 12px;font-size:14px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.banner button{font:700 13px var(--f-b);border:0;background:var(--card);color:var(--ink);border-radius:10px;padding:8px 10px}
+.err{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad);border-radius:14px;padding:12px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="card empty">Завантажую…</div></div>
+<script>
+const API = 'https://jghlyjhpqherweplohrl.supabase.co/functions/v1/family-bot';
+const tg = window.Telegram && window.Telegram.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+let state = null, date = null, pkid = 'vlad', preview = false, busy = false;
+const uah = n => Math.round(n).toLocaleString('uk-UA') + ' ₴';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const mins = s => { const m = Math.round(s/60); return m >= 60 ? Math.floor(m/60)+' год '+(m%60)+' хв' : m+' хв'; };
+const addD = (d, n) => { const x = new Date(d+'T12:00:00Z'); x.setUTCDate(x.getUTCDate()+n); return x.toISOString().slice(0,10); };
+const DN = ['нд','пн','вт','ср','чт','пт','сб'];
+const shortD = d => { const x = new Date(d+'T12:00:00Z'); return DN[x.getUTCDay()]+' '+x.getUTCDate()+'.'+String(x.getUTCMonth()+1).padStart(2,'0'); };
+const ICON = {auto:'☀️', self:'', timed:'📚', screen:'🎮', parent:'🌙'};
+
+async function call(action, extra={}) {
+  if (!tg || !tg.initData) { render({error:'Відкрийте цю сторінку з бота @Pidsumky_bot.'}); return; }
+  busy = true;
+  try {
+    const r = await fetch(API, {method:'POST', headers:{'content-type':'application/json','x-tg-init-data':tg.initData}, body:JSON.stringify({action, date, kid:pkid, ...extra})});
+    const j = await r.json();
+    if (!r.ok) { render({error: j.error==='not_member' ? 'Спершу підключіться до бота за посиланням-запрошенням.' : 'Не вдалося завантажити. Спробуйте ще раз.'}); return; }
+    state = j; if (!date) date = j.role==='parent' ? j.detail.date : j.today; render(j);
+  } catch(e) { render({error:'Немає звʼязку із сервером. Перевірте інтернет.'}); }
+  finally { busy = false; }
+}
+
+function goalCard(k) {
+  const p = k.piggy;
+  if (!p.goal) return `<section class="card"><div class="lbl">Скарбничка · ${esc(k.name)}</div><div class="big">${uah(p.bal)}</div><div class="muted">Ціль ще не обрана</div></section>`;
+  const pct = Math.min(100, p.bal/p.goal*100), step = p.goal >= 20000 ? 10000 : 0, marks = [];
+  if (step) for (let v = step; v < p.goal; v += step) marks.push(v);
+  const left = Math.max(0, p.goal - p.bal);
+  const eta = left===0 ? 'Ціль досягнута! 🎉' : p.avg > 0 ? '≈ '+Math.ceil(left/p.avg)+' тиж. у такому темпі' : 'прогноз після першого тижня';
+  return `<section class="card"><div class="row"><div><div class="lbl">${esc(k.name)} збирає на</div><h1>${esc(p.goal_name||'Ціль')}</h1></div><div class="num" style="font-size:18px;font-weight:600">${uah(p.bal)}<span class="muted" style="font-size:12px"> / ${uah(p.goal)}</span></div></div>
+  <div class="bar"><i style="width:${pct}%"></i>${marks.map(v=>`<s style="left:${v/p.goal*100}%"></s>`).join('')}</div>
+  <div class="row muted" style="font-size:13px"><span>${Math.round(pct)}%</span><span>${eta}</span></div></section>`;
+}
+function itemsHTML(k, mode) { // mode: 'kid' | 'parent' | 'view'
+  return k.items.map(it => {
+    const cls = it.done === true ? 'ok' : it.done === false ? 'no' : '';
+    const mark = it.done === true ? '✓' : it.done === false ? '✕' : (ICON[it.type] || '');
+    const by = mode==='parent' && it.by ? ' · відмітив '+it.by : '';
+    const pick = (act) => `<span class="pick"><button data-act="${act}" data-h="${it.k}" data-v="1" aria-pressed="${it.done===true}">✅ Виконав</button><button data-act="${act}" data-h="${it.k}" data-v="0" aria-pressed="${it.done===false}">❌ Не виконав</button></span>`;
+    if (it.can && ((mode==='kid' && it.type==='self') || (mode==='parent' && it.type!=='screen'))) return `<div class="item ${cls}"><span class="box">${mark}</span><span><span class="t">${esc(it.t)}</span><br><span class="s">${esc(it.status)}${by}${it.done===null?' · ще не відмічено':''}</span>${pick(mode==='kid'?'set':'pset')}</span></div>`;
+    if (mode==='kid' && it.can && it.type === 'screen') return `<div class="item ${cls}"><span class="box">${mark}</span><span><span class="t">${esc(it.t)}</span><br><span class="s">${esc(it.status)}</span><span class="pick"><button data-act="screen" data-v="1" aria-pressed="${it.done===true}">✅ Вклався</button><button data-act="screen" data-v="0" aria-pressed="${it.done===false}">❌ Ні</button></span></span></div>`;
+    let act = '';
+    if (it.can && mode==='kid') act = it.type==='self' ? `data-act="toggle" data-h="${it.k}"` : it.type==='auto' ? 'data-act="wake"' : it.type==='timed' ? 'data-act="hw"' : '';
+    if (it.can && mode==='parent') act = `data-act="ptoggle" data-h="${it.k}"`;
+    const verb = mode==='kid' && it.can && it.type==='auto' ? ' · натисни, як прокинувся' : mode==='kid' && it.can && it.type==='timed' ? ' · натисни, як закінчиш' : mode==='parent' && it.type==='screen' ? ' · оцінює сам' : '';
+    return `<button class="item ${cls}" ${act || 'disabled'}><span class="box">${mark}</span><span><span class="t">${esc(it.t)}</span><br><span class="s">${esc(it.status)}${by}${verb}</span></span></button>`;
+  }).join('');
+}
+function streakHTML(w) {
+  return `<div class="streak">${w.streak.map((v,i)=>`<div class="${w.clean&&w.level===i?'on':''}"><b>+${v} ₴</b>${i===0?'1-й тиждень':i===1?'2-й поспіль':'3-й і далі'}</div>`).join('')}</div>`;
+}
+function weekCard(k) {
+  const w = k.week;
+  return `<section class="card"><div class="lbl">Цього тижня</div><div class="row"><span class="big">${uah(w.total)}</span><span class="muted">з ${uah(w.max)}</span></div>
+  ${streakHTML(w)}
+  <div class="muted" style="font-size:13px">${w.clean?`Пропусків ${w.misses} з 2 дозволених: серійний бонус поки твій 🔥`:`Пропусків ${w.misses}: серійний бонус цього тижня згорів`}</div>
+  <div class="wk">${w.rows.map(r=>`<span>${esc(r.t)}</span><span class="v ${r.done===r.sch?'full':''}">${r.done}/${r.sch}</span>`).join('')}</div></section>`;
+}
+function kidHTML(k, mode) {
+  const yday = addD(k.today, -1);
+  const seg = mode==='kid' ? `<div class="seg"><button data-act="day" data-v="${k.today}" aria-pressed="${date===k.today}">Сьогодні</button><button data-act="day" data-v="${yday}" aria-pressed="${date===yday}">Вчора</button></div>` : '';
+  return `<div class="lbl" style="padding:0 4px">Твій день · ${esc(k.name)}</div>` + goalCard(k) + seg + `
+    <section class="card">${k.approved?'<div class="muted">🔒 Тиждень підтверджено</div>':''}${itemsHTML(k, mode)}
+    ${k.pc&&k.date===k.today?`<div class="muted" style="font-size:13px">🖥 Твій ПК сьогодні: ігри ${mins(k.pc.game)} · соцмережі ${mins(k.pc.social)} · навчання ${mins(k.pc.study)} (бачиш тільки ти)</div>`:''}</section>` + weekCard(k);
+}
+function parentHTML(j) {
+  const d = j.detail, w = d.week, my = (d.praise||{})[j.pkey] || {};
+  const sw = `<div class="kidsw">${j.kids.map(k=>`<button data-act="pkid" data-v="${k.kid}" aria-pressed="${k.kid===pkid}"><b>${esc(k.name)}</b><span>${k.joined?`сьогодні ${k.done}/${k.total} · тиждень ${uah(k.week)}`:'ще не підключився'}</span><span>скарбничка ${uah(k.bal)}</span></button>`).join('')}</div>`;
+  if (preview) return `<div class="banner"><span>👀 Так бачить ${esc(d.name)}</span><button data-act="preview" data-v="0">Назад до керування</button></div>` + kidHTML({...d, pc:null}, 'view');
+  const today = d.today, wk = w.id, prevW = addD(wk,-7), nextW = addD(wk,7);
+  const strip = `<div class="days"><button class="arrow" data-act="pday" data-v="${addD(prevW,6)}" aria-label="Попередній тиждень">‹</button>${d.days.map(x=>`<button class="${x.done===x.total&&!x.future?'full':''}" data-act="pday" data-v="${x.date}" aria-pressed="${x.date===d.date}" ${x.future?'disabled':''}>${x.dn}<span>${x.num}</span><small>${x.future?'':x.done+'/'+x.total}</small></button>`).join('')}<button class="arrow" data-act="pday" data-v="${nextW<=today?nextW:today}" ${wk>=addD(today,-((new Date(today+'T12:00:00Z').getUTCDay()+6)%7))?'disabled':''} aria-label="Наступний тиждень">›</button></div>`;
+  const news = d.news.length ? d.news.map(n=>`<div class="nrow"><span class="tx"><span class="k">${n.type==='learn'?'дізнався':n.type==='try'?'спробував':'дочитав книжку'}</span>${esc(n.text)}</span><span class="pick" style="margin:0">${w.approved?(n.ok===true?'✅':n.ok===false?'❌':'—'):`<button data-act="pnews" data-id="${n.id}" data-v="1" aria-pressed="${n.ok===true}">✅</button><button data-act="pnews" data-id="${n.id}" data-v="0" aria-pressed="${n.ok===false}">❌</button>`}</span></div>`).join('') : `<div class="muted" style="font-size:14px">${esc(d.name)} ще нічого не додав. Він додає це в боті: «✨ Нове».</div>`;
+  const p = w.parts;
+  const lines = [['Базова',p.base],['Звички',p.habits],['Без пропусків',p.perfect],['Серійний бонус',p.streak],['Нове',p.news],['Книжки',p.books],['Похвала',p.praise]];
+  const approve = w.approved ? `<div class="note">✅ Тиждень підтверджено: ${uah(w.paid)}${w.matched?` + ${uah(w.matched)} від батьків`:''}</div>` : w.complete ? `<button class="cta" data-act="papprove">Підтвердити тиждень · ${uah(w.total)}${w.match?` + ${uah(w.total*w.match/100)}`:''}</button>` : `<div class="muted" style="font-size:13px">Підтвердити можна в неділю або пізніше.</div>`;
+  return `<div class="row" style="padding:0 4px"><h1>Керування</h1><span class="lbl">${esc(j.name)}</span></div>` + sw +
+    (j.note ? `<div class="note">${esc(j.note)}</div>` : '') + goalCard(d) +
+    `<section class="card"><div class="row"><h2>Відмітки · ${shortD(d.date)}</h2>${d.approved?'<span class="lbl">🔒</span>':''}</div>${strip}${itemsHTML(d,'parent')}
+     <div class="muted" style="font-size:13px">${d.approved?'Тиждень підтверджено, зміни закрито.':'Для кожного пункту виберіть: виконав чи ні. Екранний час оцінює сам '+esc(d.name)+'.'}</div></section>
+    <section class="card"><h2>Нове цього тижня</h2>${news}</section>
+    <section class="card"><h2>Ваша похвала</h2><div class="muted" style="font-size:13px">До 50 ₴ від кожного з батьків. Тільки плюс і з поясненням: ${esc(d.name)} його прочитає.</div>
+     <div class="pick" style="margin:0">${[0,25,50].map(v=>`<button data-act="pamt" data-v="${v}" aria-pressed="${(my.amt||0)===v}" ${w.approved?'disabled':''}>${v} ₴</button>`).join('')}</div>
+     <input class="why" id="why" placeholder="За що саме? Конкретна дія" value="${esc(my.why||'')}" ${w.approved?'disabled':''}>
+     ${w.approved?'':'<button class="ghost" data-act="psave">Зберегти похвалу</button>'}</section>
+    <section class="card"><div class="row"><h2>Тиждень</h2><span class="big" style="font-size:22px">${uah(w.approved?w.paid:w.total)}</span></div>${streakHTML(w)}
+     <div class="lines">${lines.map(([t,v])=>`<div class="l"><span>${t}</span><span class="v">${uah(v)}</span></div>`).join('')}</div>${approve}</section>
+    <button class="ghost" data-act="preview" data-v="1">👀 Як бачить ${esc(d.name)}</button>`;
+}
+let pamt = null;
+function render(j) {
+  const app = document.getElementById('app');
+  if (j.error) { app.innerHTML = `<div class="err">${esc(j.error)}</div>`; return; }
+  app.innerHTML = j.role === 'parent' ? parentHTML(j) : kidHTML(j, 'kid');
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b || busy || b.disabled) return;
+  const a = b.dataset.act, v = b.dataset.v;
+  if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+  if (a==='day') { date = v; call('app_state'); }
+  if (a==='set') call('app_toggle', {habit:b.dataset.h, ok: v==='1'});
+  if (a==='wake') call('app_wake');
+  if (a==='hw') call('app_hw');
+  if (a==='screen') call('app_screen', {ok: v==='1'});
+  if (a==='pkid') { pkid = v; preview = false; pamt = null; call('app_state'); }
+  if (a==='pday') { date = v; call('app_state'); }
+  if (a==='pset') call('app_p_toggle', {habit:b.dataset.h, ok: v==='1'});
+  if (a==='pnews') call('app_p_news', {id:b.dataset.id, ok: v==='1'});
+  if (a==='pamt') { pamt = Number(v); document.querySelectorAll('[data-act=pamt]').forEach(x=>x.setAttribute('aria-pressed', x===b)); }
+  if (a==='psave') { const my = (state.detail.praise||{})[state.pkey]||{}; call('app_p_praise', {amt: pamt ?? (my.amt||0), why: document.getElementById('why').value}); }
+  if (a==='papprove') { if (b.dataset.confirm) call('app_p_approve'); else { b.dataset.confirm = '1'; b.textContent = 'Натисніть ще раз, щоб підтвердити'; } }
+  if (a==='preview') { preview = v==='1'; render(state); window.scrollTo(0,0); }
+});
+call('app_state');
+</script>
+</body>
+</html>
