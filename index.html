@@ -99,13 +99,14 @@ async function call(action, extra={}) {
 function goalCard(k) {
   const p = k.piggy;
   if (!p.goal) return `<section class="card"><div class="lbl">Скарбничка · ${esc(k.name)}</div><div class="big">${uah(p.bal)}</div><div class="muted">Ціль ще не обрана</div></section>`;
-  const pct = Math.min(100, p.bal/p.goal*100), step = p.goal >= 20000 ? 10000 : 0, marks = [];
+  const tot = p.total ?? p.bal; // свої + обіцяна доплата батьків (платять при купівлі)
+  const pct = Math.min(100, tot/p.goal*100), step = p.goal >= 20000 ? 10000 : 0, marks = [];
   if (step) for (let v = step; v < p.goal; v += step) marks.push(v);
-  const left = Math.max(0, p.goal - p.bal);
+  const left = Math.max(0, p.goal - tot);
   const eta = left===0 ? 'Ціль досягнута! 🎉' : p.avg > 0 ? '≈ '+Math.ceil(left/p.avg)+' тиж. у такому темпі' : 'прогноз після першого тижня';
-  return `<section class="card"><div class="row"><div><div class="lbl">${esc(k.name)} збирає на</div><h1>${esc(p.goal_name||'Ціль')}</h1></div><div class="num" style="font-size:18px;font-weight:600">${uah(p.bal)}<span class="muted" style="font-size:12px"> / ${uah(p.goal)}</span></div></div>
+  return `<section class="card"><div class="row"><div><div class="lbl">${esc(k.name)} збирає на</div><h1>${esc(p.goal_name||'Ціль')}</h1></div><div class="num" style="font-size:18px;font-weight:600">${uah(tot)}<span class="muted" style="font-size:12px"> / ${uah(p.goal)}</span></div></div>
   <div class="bar"><i style="width:${pct}%"></i>${marks.map(v=>`<s style="left:${v/p.goal*100}%"></s>`).join('')}</div>
-  <div class="row muted" style="font-size:13px"><span>${Math.round(pct)}%</span><span>${eta}</span></div></section>`;
+  <div class="row muted" style="font-size:13px"><span>${Math.round(pct)}%</span><span>${eta}</span></div>${p.promised?`<div class="muted" style="font-size:13px">💪 твої ${uah(p.bal)} + батьки докладуть ${uah(p.promised)} при купівлі</div>`:''}</section>`;
 }
 // сума за один виконаний день звички приходить із сервера (вага × ставка)
 const rw = it => it.reward != null ? `<span class="rw">+${it.reward} ₴</span>` : '';
@@ -155,7 +156,7 @@ function parentHTML(j) {
   const news = d.news.length ? d.news.map(n=>`<div class="nrow"><span class="tx"><span class="k">${n.type==='learn'?'дізнався':n.type==='try'?'спробував':'дочитав книжку'}</span>${esc(n.text)}</span><span class="pick" style="margin:0">${w.approved?(n.ok===true?'✅':n.ok===false?'❌':'—'):`<button data-act="pnews" data-id="${n.id}" data-v="1" aria-pressed="${n.ok===true}">✅</button><button data-act="pnews" data-id="${n.id}" data-v="0" aria-pressed="${n.ok===false}">❌</button>`}</span></div>`).join('') : `<div class="muted" style="font-size:14px">${esc(d.name)} ще нічого не додав. Він додає це в боті: «✨ Нове».</div>`;
   const p = w.parts;
   const lines = [['Базова',p.base],['Звички',p.habits],['Без пропусків',p.perfect],['Серійний бонус',p.streak],['Нове',p.news],['Книжки',p.books],['Похвала',p.praise]];
-  const approve = w.approved ? `<div class="note">✅ Тиждень підтверджено: ${uah(w.paid)}${w.matched?` + ${uah(w.matched)} від батьків`:''}</div>` : w.complete ? `<button class="cta" data-act="papprove">Підтвердити тиждень · ${uah(w.total)}${w.match?` + ${uah(w.total*w.match/100)}`:''}</button>` : `<div class="muted" style="font-size:13px">Підтвердити можна в неділю або пізніше.</div>`;
+  const approve = w.approved ? `<div class="note">✅ Тиждень підтверджено: ${uah(w.paid)}</div>` : w.complete ? `<button class="cta" data-act="papprove">Підтвердити тиждень · ${uah(w.total)}</button>` : `<div class="muted" style="font-size:13px">Підтвердити можна в неділю або пізніше.</div>`;
   return `<div class="row" style="padding:0 4px"><h1>Керування</h1><span class="lbl">${esc(j.name)}</span></div>` + sw +
     (j.note ? `<div class="note">${esc(j.note)}</div>` : '') + goalCard(d) +
     `<section class="card"><div class="row"><h2>Відмітки · ${shortD(d.date)}</h2>${d.approved?'<span class="lbl">🔒</span>':''}</div>${strip}${itemsHTML(d,'parent')}
