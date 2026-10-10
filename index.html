@@ -63,6 +63,7 @@ h1,h2{font-family:var(--f-d);margin:0;letter-spacing:-.01em} h1{font-size:20px} 
 .nrow:last-child{border:0}.nrow .tx{min-width:0;overflow-wrap:anywhere;font-size:14px}
 .nrow .k{display:block;font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.06em}
 input.why{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;width:100%}
+select.why{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;width:100%;-webkit-appearance:none;appearance:none}
 .ghost{font:700 14px var(--f-b);border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:14px;padding:12px;width:100%}
 .banner{background:var(--coin-soft);border-radius:14px;padding:10px 12px;font-size:14px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px}
 .banner button{font:700 13px var(--f-b);border:0;background:var(--card);color:var(--ink);border-radius:10px;padding:8px 10px}
@@ -130,6 +131,28 @@ function itemsHTML(k, mode) { // mode: 'kid' | 'parent' | 'view'
     return `<button class="item ${cls}" ${act || 'disabled'}><span class="box">${mark}</span><span><span class="t">${esc(it.t)}</span>${rw(it)}<br><span class="s">${esc(it.status)}${by}${verb}</span></span></button>`;
   }).join('');
 }
+const TBTN = {take:'🙋 Беру', done:'✅ Зробив', drop:'↩️ Відмовитись'};
+function tasksCard(k, view) {
+  if (!k.tasks || !k.tasks.length) return '';
+  const dis = view ? ' disabled' : '';
+  return `<section class="card"><h2>🧹 Задачі</h2><div class="muted" style="font-size:13px">Додаткові гроші. Зараховують батьки, коли перевірять.</div>${k.tasks.map(t=>`<div class="item"><span class="box">🧹</span><span><span class="t">${esc(t.title)}</span><span class="rw">+${t.price} ₴</span><br><span class="s">${t.mode==='pair'?'удвох — навпіл · ':t.daily?'':'від батьків · '}${esc(t.state)}</span>${t.acts.length?`<span class="pick">${t.acts.map(a=>`<button data-act="task" data-a="${a}" data-id="${t.id}"${dis}>${TBTN[a]}</button>`).join('')}</span>`:''}</span></div>`).join('')}</section>`;
+}
+function ptasksHTML(T) {
+  if (!T) return '';
+  const pend = T.pending.length ? T.pending.map(p=>`<div class="nrow"><span class="tx"><span class="k">${esc(p.name)} · ${shortD(p.day)}</span>${esc(p.title)} · ${uah(p.price)}${p.mode==='pair'?' (навпіл, якщо удвох)':''}</span><span class="pick" style="margin:0"><button data-act="ptask" data-id="${p.claim}" data-v="1">✅</button><button data-act="ptask" data-id="${p.claim}" data-v="0">❌</button></span></div>`).join('') : '<div class="muted" style="font-size:14px">Нічого не чекає.</div>';
+  const act = T.active.map(t=>`<div class="nrow"><span class="tx"><span class="k">${esc(t.state)}</span>${esc(t.title)} · ${uah(t.price)}</span><span class="pick" style="margin:0"><button data-act="pcancel" data-id="${t.id}">Зняти</button></span></div>`).join('');
+  const opts = T.catalog.filter(c=>!c.daily).map(c=>`<option value="${c.id}" data-price="${c.price}">${esc(c.title)} · ${c.price} ₴</option>`).join('');
+  const prices = T.catalog.map(c=>`<div class="nrow"><span class="tx">${esc(c.title)}${c.daily?`<span class="k">щодня · ${c.mode==='pair'?'удвох навпіл':'хто перший'}</span>`:''}</span><span class="pick" style="margin:0;align-items:center"><input class="why" type="number" inputmode="numeric" data-cprice="${c.id}" value="${c.price}" style="width:76px;padding:8px"><button data-act="pprice" data-id="${c.id}">💾</button></span></div>`).join('');
+  return `<section class="card"><h2>🧹 Задачі</h2>
+    <div class="lbl">Чекають підтвердження</div>${pend}
+    ${act?`<div class="lbl">Дошка</div>${act}`:''}
+    <div class="lbl">Дати завдання · хто перший</div>
+    <select id="tsel" class="why"><option value="">✏️ Своє завдання…</option>${opts}</select>
+    <input class="why" id="ttitle" placeholder="Назва свого завдання">
+    <div class="row" style="flex-wrap:nowrap"><input class="why" id="tprice" type="number" inputmode="numeric" value="${T.def}" style="width:100px"><label class="muted" style="font-size:13px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="tsave"> запам'ятати в списку</label></div>
+    <button class="cta" data-act="ppost">Опублікувати</button>
+    <details><summary class="muted" style="font-size:14px">Ціни за замовчуванням</summary>${prices}</details></section>`;
+}
 function streakHTML(w) {
   return `<div class="streak">${w.streak.map((v,i)=>`<div class="${w.clean&&w.level===i?'on':''}"><b>+${v} ₴</b>${i===0?'1-й тиждень':i===1?'2-й поспіль':'3-й і далі'}</div>`).join('')}</div>`;
 }
@@ -139,14 +162,14 @@ function weekCard(k) {
   ${streakHTML(w)}
   <div class="muted" style="font-size:13px">${w.clean?`Пропусків ${w.misses} з 2 дозволених: серійний бонус поки твій 🔥`:`Пропусків ${w.misses}: серійний бонус цього тижня згорів`}</div>
   <div class="wk">${w.rows.map(r=>`<span>${esc(r.t)}</span><span class="v ${r.done===r.sch?'full':''}">${r.done}/${r.sch}</span>`).join('')}</div>
-  <div class="muted" style="font-size:13px;margin-top:10px;line-height:1.5"><b>Як складається сума</b><br>🛡 ${uah(w.parts.base)} гарантовано щотижня<br>✅ за кожен виконаний пункт: сума біля нього<br>⭐ +${r.perfect} ₴ за звичку без жодного пропуску за тиждень<br>🔥 серійний бонус: +${w.streak.join(' / +')} ₴ (росте, якщо тижні без пропусків ідуть поспіль)<br>✨ +${r.news} ₴ дізнався нове · +${r.news} ₴ спробував нове · +${r.book} ₴ за книжку<br>👍 до +${r.praise} ₴ похвала від мами і до +${r.praise} ₴ від тата</div></section>`;
+  <div class="muted" style="font-size:13px;margin-top:10px;line-height:1.5"><b>Як складається сума</b><br>🛡 ${uah(w.parts.base)} гарантовано щотижня<br>✅ за кожен виконаний пункт: сума біля нього<br>⭐ +${r.perfect} ₴ за звичку без жодного пропуску за тиждень<br>🔥 серійний бонус: +${w.streak.join(' / +')} ₴ (росте, якщо тижні без пропусків ідуть поспіль)<br>✨ +${r.news} ₴ дізнався нове · +${r.news} ₴ спробував нове · +${r.book} ₴ за книжку<br>👍 до +${r.praise} ₴ похвала від мами і до +${r.praise} ₴ від тата<br>🧹 задачі: сума біля кожної, після підтвердження батьків${w.parts.chores?` (цього тижня ${uah(w.parts.chores)})`:''}</div></section>`;
 }
 function kidHTML(k, mode) {
   const yday = addD(k.today, -1);
   const seg = mode==='kid' ? `<div class="seg"><button data-act="day" data-v="${k.today}" aria-pressed="${date===k.today}">Сьогодні</button><button data-act="day" data-v="${yday}" aria-pressed="${date===yday}">Вчора</button></div>` : '';
   return `<div class="lbl" style="padding:0 4px">Твій день · ${esc(k.name)}</div>` + goalCard(k) + seg + `
     <section class="card">${k.approved?'<div class="muted">🔒 Тиждень підтверджено</div>':''}${itemsHTML(k, mode)}
-    ${k.pc&&k.date===k.today?`<div class="muted" style="font-size:13px">🖥 Твій ПК сьогодні: ігри ${mins(k.pc.game)} · соцмережі ${mins(k.pc.social)} · навчання ${mins(k.pc.study)} (бачиш тільки ти)</div>`:''}</section>` + weekCard(k);
+    ${k.pc&&k.date===k.today?`<div class="muted" style="font-size:13px">🖥 Твій ПК сьогодні: ігри ${mins(k.pc.game)} · соцмережі ${mins(k.pc.social)} · навчання ${mins(k.pc.study)} (бачиш тільки ти)</div>`:''}</section>` + tasksCard(k, mode==='view') + weekCard(k);
 }
 function parentHTML(j) {
   const d = j.detail, w = d.week, my = (d.praise||{})[j.pkey] || {}, pr = (w.rates||{}).praise ?? 50;
@@ -156,12 +179,13 @@ function parentHTML(j) {
   const strip = `<div class="days"><button class="arrow" data-act="pday" data-v="${addD(prevW,6)}" aria-label="Попередній тиждень">‹</button>${d.days.map(x=>`<button class="${x.done===x.total&&!x.future?'full':''}" data-act="pday" data-v="${x.date}" aria-pressed="${x.date===d.date}" ${x.future?'disabled':''}>${x.dn}<span>${x.num}</span><small>${x.future?'':x.done+'/'+x.total}</small></button>`).join('')}<button class="arrow" data-act="pday" data-v="${nextW<=today?nextW:today}" ${wk>=addD(today,-((new Date(today+'T12:00:00Z').getUTCDay()+6)%7))?'disabled':''} aria-label="Наступний тиждень">›</button></div>`;
   const news = d.news.length ? d.news.map(n=>`<div class="nrow"><span class="tx"><span class="k">${n.type==='learn'?'дізнався':n.type==='try'?'спробував':'дочитав книжку'}</span>${esc(n.text)}</span><span class="pick" style="margin:0">${w.approved?(n.ok===true?'✅':n.ok===false?'❌':'—'):`<button data-act="pnews" data-id="${n.id}" data-v="1" aria-pressed="${n.ok===true}">✅</button><button data-act="pnews" data-id="${n.id}" data-v="0" aria-pressed="${n.ok===false}">❌</button>`}</span></div>`).join('') : `<div class="muted" style="font-size:14px">${esc(d.name)} ще нічого не додав. Він додає це в боті: «✨ Нове».</div>`;
   const p = w.parts;
-  const lines = [['Базова',p.base],['Звички',p.habits],['Без пропусків',p.perfect],['Серійний бонус',p.streak],['Нове',p.news],['Книжки',p.books],['Похвала',p.praise]];
+  const lines = [['Базова',p.base],['Звички',p.habits],['Без пропусків',p.perfect],['Серійний бонус',p.streak],['Нове',p.news],['Книжки',p.books],['Похвала',p.praise],['Задачі',p.chores||0]];
   const approve = w.approved ? `<div class="note">✅ Тиждень підтверджено: ${uah(w.paid)}</div>` : w.complete ? `<button class="cta" data-act="papprove">Підтвердити тиждень · ${uah(w.total)}</button>` : `<div class="muted" style="font-size:13px">Підтвердити можна в неділю або пізніше.</div>`;
   return `<div class="row" style="padding:0 4px"><h1>Керування</h1><span class="lbl">${esc(j.name)}</span></div>` + sw +
     (j.note ? `<div class="note">${esc(j.note)}</div>` : '') + goalCard(d) +
     `<section class="card"><div class="row"><h2>Відмітки · ${shortD(d.date)}</h2>${d.approved?'<span class="lbl">🔒</span>':''}</div>${strip}${itemsHTML(d,'parent')}
      <div class="muted" style="font-size:13px">${d.approved?'Тиждень підтверджено, зміни закрито.':'Для кожного пункту виберіть: виконав чи ні. Екранний час оцінює сам '+esc(d.name)+'.'}</div></section>
+    ${ptasksHTML(j.tasks)}
     <section class="card"><h2>Нове цього тижня</h2>${news}</section>
     <section class="card"><h2>Ваша похвала</h2><div class="muted" style="font-size:13px">До ${pr} ₴ від кожного з батьків. Тільки плюс і з поясненням: ${esc(d.name)} його прочитає.</div>
      <div class="pick" style="margin:0">${[0,Math.round(pr/2),pr].map(v=>`<button data-act="pamt" data-v="${v}" aria-pressed="${(my.amt||0)===v}" ${w.approved?'disabled':''}>${v} ₴</button>`).join('')}</div>
@@ -175,7 +199,7 @@ let pamt = null;
 function render(j) {
   const app = document.getElementById('app');
   if (j.error) { app.innerHTML = `<div class="err">${esc(j.error)}</div>`; return; }
-  app.innerHTML = j.role === 'parent' ? parentHTML(j) : kidHTML(j, 'kid');
+  app.innerHTML = j.role === 'parent' ? parentHTML(j) : (j.note ? `<div class="note">${esc(j.note)}</div>` : '') + kidHTML(j, 'kid');
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b || busy || b.disabled) return;
@@ -193,7 +217,19 @@ document.addEventListener('click', e => {
   if (a==='pamt') { pamt = Number(v); document.querySelectorAll('[data-act=pamt]').forEach(x=>x.setAttribute('aria-pressed', x===b)); }
   if (a==='psave') { const my = (state.detail.praise||{})[state.pkey]||{}; call('app_p_praise', {amt: pamt ?? (my.amt||0), why: document.getElementById('why').value}); }
   if (a==='papprove') { if (b.dataset.confirm) call('app_p_approve'); else { b.dataset.confirm = '1'; b.textContent = 'Натисніть ще раз, щоб підтвердити'; } }
+  if (a==='task') call('app_task_'+b.dataset.a, {id: b.dataset.id});
+  if (a==='ptask') call('app_p_task_ok', {claim: b.dataset.id, ok: v==='1'});
+  if (a==='pcancel') { if (b.dataset.confirm) call('app_p_task_cancel', {id: b.dataset.id}); else { b.dataset.confirm = '1'; b.textContent = 'Точно?'; } }
+  if (a==='pprice') call('app_p_chore_price', {id: b.dataset.id, price: Number(document.querySelector(`[data-cprice="${b.dataset.id}"]`).value)});
+  if (a==='ppost') { const sel = document.getElementById('tsel'); call('app_p_task_post', {chore: sel.value || null, title: document.getElementById('ttitle').value, price: Number(document.getElementById('tprice').value), save: document.getElementById('tsave').checked}); }
   if (a==='preview') { preview = v==='1'; render(state); window.scrollTo(0,0); }
+});
+// вибір задачі зі списку підставляє її ціну; поле назви — лише для свого завдання
+document.addEventListener('change', e => {
+  if (e.target.id !== 'tsel') return;
+  const o = e.target.selectedOptions[0];
+  document.getElementById('tprice').value = o.dataset.price || (state.tasks && state.tasks.def) || 20;
+  document.getElementById('ttitle').style.display = e.target.value ? 'none' : '';
 });
 call('app_state');
 </script>
