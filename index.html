@@ -123,7 +123,7 @@ function itemsHTML(k, mode) { // mode: 'kid' | 'parent' | 'view'
     const pick = (act) => `<span class="pick"><button data-act="${act}" data-h="${it.k}" data-v="1" aria-pressed="${it.done===true}"${dis}>✅ Виконав</button><button data-act="${act}" data-h="${it.k}" data-v="0" aria-pressed="${it.done===false}"${dis}>❌ Не виконав</button></span>`;
     if (it.can && ((mode==='kid' && it.type==='self') || (mode==='parent' && it.type!=='screen'))) return `<div class="item ${cls}"><span class="box">${mark}</span><span><span class="t">${esc(it.t)}</span>${rw(it)}<br><span class="s">${esc(it.status)}${by}${it.done===null?' · ще не відмічено':''}</span>${pick(mode==='kid'?'set':'pset')}</span></div>`;
     if (mode==='kid' && it.can && it.type === 'screen') return `<div class="item ${cls}"><span class="box">${mark}</span><span><span class="t">${esc(it.t)}</span>${rw(it)}<br><span class="s">${esc(it.status)}</span><span class="pick"><button data-act="screen" data-v="1" aria-pressed="${it.done===true}"${dis}>✅ Вклався</button><button data-act="screen" data-v="0" aria-pressed="${it.done===false}"${dis}>❌ Ні</button></span></span></div>`;
-    if (mode==='kid' && it.can && it.type === 'timed') return `<div class="item ${cls}"><span class="box">${mark}</span><span><span class="t">${esc(it.t)}</span>${rw(it)}<br><span class="s">${esc(it.status)}</span><span class="pick"><button data-act="hw" data-v="1" aria-pressed="false"${dis}>✅ Зробив</button><button data-act="hw" data-v="0" aria-pressed="${it.done===false}"${dis}>❌ Не зробив</button></span></span></div>`;
+    if (mode==='kid' && it.can && it.type === 'timed') return `<div class="item ${cls}"><span class="box">${mark}</span><span><span class="t">${esc(it.t)}</span>${rw(it)}<br><span class="s">${esc(it.status)}</span><span class="pick"><button data-act="hw" data-v="1" aria-pressed="false"${dis}>✅ Виконав</button><button data-act="hw" data-v="0" aria-pressed="${it.done===false}"${dis}>❌ Не виконав</button></span></span></div>`;
     let act = '';
     if (it.can && mode==='kid' && !view) act = it.type==='self' ? `data-act="toggle" data-h="${it.k}"` : it.type==='auto' ? 'data-act="wake"' : it.type==='timed' ? 'data-act="hw"' : '';
     if (it.can && mode==='parent') act = `data-act="ptoggle" data-h="${it.k}"`;
@@ -132,7 +132,7 @@ function itemsHTML(k, mode) { // mode: 'kid' | 'parent' | 'view'
   }).join('');
 }
 let tmode = 'first'; // режим нового завдання від батьків
-const TBTN = {take:'🙋 Беру', done:'✅ Зробив', drop:'↩️ Відмовитись'};
+const TBTN = {take:'🙋 Беру', done:'✅ Виконав', drop:'↩️ Відмовитись'};
 function tasksCard(k, view) {
   if (!k.tasks || !k.tasks.length) return '';
   const dis = view ? ' disabled' : '';
