@@ -131,6 +131,7 @@ function itemsHTML(k, mode) { // mode: 'kid' | 'parent' | 'view'
     return `<button class="item ${cls}" ${act || 'disabled'}><span class="box">${mark}</span><span><span class="t">${esc(it.t)}</span>${rw(it)}<br><span class="s">${esc(it.status)}${by}${verb}</span></span></button>`;
   }).join('');
 }
+let tmode = 'first'; // режим нового завдання від батьків
 const TBTN = {take:'🙋 Беру', done:'✅ Зробив', drop:'↩️ Відмовитись'};
 function tasksCard(k, view) {
   if (!k.tasks || !k.tasks.length) return '';
@@ -139,14 +140,18 @@ function tasksCard(k, view) {
 }
 function ptasksHTML(T) {
   if (!T) return '';
-  const pend = T.pending.length ? T.pending.map(p=>`<div class="nrow"><span class="tx"><span class="k">${esc(p.name)} · ${shortD(p.day)}</span>${esc(p.title)} · ${uah(p.price)}${p.mode==='pair'?' (навпіл, якщо удвох)':''}</span><span class="pick" style="margin:0"><button data-act="ptask" data-id="${p.claim}" data-v="1">✅</button><button data-act="ptask" data-id="${p.claim}" data-v="0">❌</button></span></div>`).join('') : '<div class="muted" style="font-size:14px">Нічого не чекає.</div>';
+  // «удвох», якщо відмітили обоє: обом навпіл / лише цьому / ні
+  const pend = T.pending.length ? T.pending.map(p=>`<div class="nrow" style="flex-wrap:wrap"><span class="tx"><span class="k">${esc(p.name)} · ${shortD(p.day)}${p.group&&p.group.length>1?' · відмітили обоє':''}</span>${esc(p.title)} · ${uah(p.price)}</span><span class="pick" style="margin:0;flex-wrap:wrap">${p.group&&p.group.length>1
+    ? `<button data-act="ptask" data-how="both" data-id="${p.claim}">✅ Обом навпіл</button>${p.group.map(g=>`<button data-act="ptask" data-how="only" data-id="${g.claim}">Лише ${esc(g.name)}</button>`).join('')}<button data-act="ptask" data-how="none" data-id="${p.claim}">❌ Нікому</button>`
+    : `<button data-act="ptask" data-id="${p.claim}" data-v="1">✅</button><button data-act="ptask" data-id="${p.claim}" data-v="0">❌</button>`}</span></div>`).join('') : '<div class="muted" style="font-size:14px">Нічого не чекає.</div>';
   const act = T.active.map(t=>`<div class="nrow"><span class="tx"><span class="k">${esc(t.state)}</span>${esc(t.title)} · ${uah(t.price)}</span><span class="pick" style="margin:0"><button data-act="pcancel" data-id="${t.id}">Зняти</button></span></div>`).join('');
   const opts = T.catalog.filter(c=>!c.daily).map(c=>`<option value="${c.id}" data-price="${c.price}">${esc(c.title)} · ${c.price} ₴</option>`).join('');
   const prices = T.catalog.map(c=>`<div class="nrow"><span class="tx">${esc(c.title)}${c.daily?`<span class="k">щодня · ${c.mode==='pair'?'удвох навпіл':'хто перший'}</span>`:''}</span><span class="pick" style="margin:0;align-items:center"><input class="why" type="number" inputmode="numeric" data-cprice="${c.id}" value="${c.price}" style="width:76px;padding:8px"><button data-act="pprice" data-id="${c.id}">💾</button></span></div>`).join('');
   return `<section class="card"><h2>🧹 Задачі</h2>
     <div class="lbl">Чекають підтвердження</div>${pend}
     ${act?`<div class="lbl">Дошка</div>${act}`:''}
-    <div class="lbl">Дати завдання · хто перший</div>
+    <div class="lbl">Дати завдання</div>
+    <div class="seg" style="background:var(--bg)"><button data-act="tmode" data-v="first" aria-pressed="${tmode==='first'}">🏃 Хто перший</button><button data-act="tmode" data-v="pair" aria-pressed="${tmode==='pair'}">👥 Удвох, навпіл</button></div>
     <select id="tsel" class="why"><option value="">✏️ Своє завдання…</option>${opts}</select>
     <input class="why" id="ttitle" placeholder="Назва свого завдання">
     <div class="row" style="flex-wrap:nowrap"><input class="why" id="tprice" type="number" inputmode="numeric" value="${T.def}" style="width:100px"><label class="muted" style="font-size:13px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="tsave"> запам'ятати в списку</label></div>
@@ -218,10 +223,11 @@ document.addEventListener('click', e => {
   if (a==='psave') { const my = (state.detail.praise||{})[state.pkey]||{}; call('app_p_praise', {amt: pamt ?? (my.amt||0), why: document.getElementById('why').value}); }
   if (a==='papprove') { if (b.dataset.confirm) call('app_p_approve'); else { b.dataset.confirm = '1'; b.textContent = 'Натисніть ще раз, щоб підтвердити'; } }
   if (a==='task') call('app_task_'+b.dataset.a, {id: b.dataset.id});
-  if (a==='ptask') call('app_p_task_ok', {claim: b.dataset.id, ok: v==='1'});
+  if (a==='ptask') call('app_p_task_ok', {claim: b.dataset.id, ok: v==='1', how: b.dataset.how});
+  if (a==='tmode') { tmode = v; document.querySelectorAll('[data-act=tmode]').forEach(x=>x.setAttribute('aria-pressed', x===b)); }
   if (a==='pcancel') { if (b.dataset.confirm) call('app_p_task_cancel', {id: b.dataset.id}); else { b.dataset.confirm = '1'; b.textContent = 'Точно?'; } }
   if (a==='pprice') call('app_p_chore_price', {id: b.dataset.id, price: Number(document.querySelector(`[data-cprice="${b.dataset.id}"]`).value)});
-  if (a==='ppost') { const sel = document.getElementById('tsel'); call('app_p_task_post', {chore: sel.value || null, title: document.getElementById('ttitle').value, price: Number(document.getElementById('tprice').value), save: document.getElementById('tsave').checked}); }
+  if (a==='ppost') { const sel = document.getElementById('tsel'); call('app_p_task_post', {chore: sel.value || null, title: document.getElementById('ttitle').value, price: Number(document.getElementById('tprice').value), save: document.getElementById('tsave').checked, mode: tmode}); }
   if (a==='preview') { preview = v==='1'; render(state); window.scrollTo(0,0); }
 });
 // вибір задачі зі списку підставляє її ціну; поле назви — лише для свого завдання
