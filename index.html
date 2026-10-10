@@ -132,11 +132,11 @@ function itemsHTML(k, mode) { // mode: 'kid' | 'parent' | 'view'
   }).join('');
 }
 let tmode = 'first'; // режим нового завдання від батьків
-const TBTN = {take:'🙋 Беру', done:'✅ Виконав', drop:'↩️ Відмовитись'};
+const TBTN = {take:'🙋 Беру', done:'✅ Виконав', no:'❌ Не виконав', drop:'↩️ Відмовитись'};
 function tasksCard(k, view) {
   if (!k.tasks || !k.tasks.length) return '';
   const dis = view ? ' disabled' : '';
-  return `<section class="card"><h2>🧹 Задачі</h2><div class="muted" style="font-size:13px">Додаткові гроші. Зараховують батьки, коли перевірять.</div>${k.tasks.map(t=>`<div class="item"><span class="box">🧹</span><span><span class="t">${esc(t.title)}</span><span class="rw">+${t.price} ₴</span><br><span class="s">${t.mode==='pair'?'удвох — навпіл · ':t.daily?'':'від батьків · '}${esc(t.state)}</span>${t.acts.length?`<span class="pick">${t.acts.map(a=>`<button data-act="task" data-a="${a}" data-id="${t.id}"${dis}>${TBTN[a]}</button>`).join('')}</span>`:''}</span></div>`).join('')}</section>`;
+  return `<section class="card"><h2>🧹 Задачі</h2><div class="muted" style="font-size:13px">Додаткові гроші. Зараховують батьки, коли перевірять.</div>${k.tasks.map(t=>`<div class="item ${t.choice==='done'?'ok':t.choice==='no'?'no':''}"><span class="box">${t.choice==='done'?'✓':t.choice==='no'?'✕':'🧹'}</span><span><span class="t">${esc(t.title)}</span><span class="rw">+${t.price} ₴</span><br><span class="s">${t.mode==='pair'?'удвох — навпіл · ':t.daily?'':'від батьків · '}${esc(t.state)}</span>${t.acts.length?`<span class="pick">${t.acts.map(a=>`<button data-act="task" data-a="${a}" data-id="${t.id}" aria-pressed="${t.choice===a}"${dis}>${TBTN[a]}</button>`).join('')}</span>`:''}</span></div>`).join('')}</section>`;
 }
 function ptasksHTML(T) {
   if (!T) return '';
