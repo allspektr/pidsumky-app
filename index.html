@@ -85,17 +85,31 @@ const DN = ['нд','пн','вт','ср','чт','пт','сб'];
 const shortD = d => { const x = new Date(d+'T12:00:00Z'); return DN[x.getUTCDay()]+' '+x.getUTCDate()+'.'+String(x.getUTCMonth()+1).padStart(2,'0'); };
 const ICON = {auto:'☀️', self:'', timed:'📚', screen:'🎮', parent:'🌙'};
 
+let toast = ''; // коротке повідомлення над екраном (напр. про обрив зв'язку)
 async function call(action, extra={}) {
   if (!tg || !tg.initData) { render({error:'Відкрийте цю сторінку з бота @Pidsumky_bot.'}); return; }
   busy = true;
-  try {
-    const r = await fetch(API, {method:'POST', headers:{'content-type':'application/json','x-tg-init-data':tg.initData}, body:JSON.stringify({action, date, kid:pkid, ...extra})});
-    const j = await r.json();
-    if (!r.ok) { render({error: j.error==='not_member' ? 'Спершу підключіться до бота за посиланням-запрошенням.' : 'Не вдалося завантажити. Спробуйте ще раз.'}); return; }
-    // до 05:00 сервер віддає дитині вчорашній вечір, тож дату беремо з відповіді
-    state = j; if (!date) date = j.role==='parent' ? j.detail.date : j.date; render(j);
-  } catch(e) { render({error:'Немає звʼязку із сервером. Перевірте інтернет.'}); }
-  finally { busy = false; }
+  const send = () => fetch(API, {method:'POST', headers:{'content-type':'application/json','x-tg-init-data':tg.initData}, body:JSON.stringify({action, date, kid:pkid, ...extra})});
+  let r = null, j = null;
+  try { r = await send(); j = await r.json(); }
+  catch(e) {
+    // запит обірвався (мобільний зв'язок, згорнутий Telegram): дія могла й зберегтися,
+    // тому не повторюємо її, а через секунду просто перечитуємо стан
+    r = null; action = 'app_state'; extra = {};
+    try { await new Promise(res => setTimeout(res, 1000)); r = await send(); j = await r.json(); toast = 'Звʼязок перервався. Перевірте, чи збереглось.'; }
+    catch(e2) { r = null; }
+  }
+  busy = false;
+  if (!r) {
+    // екран не стираємо: показуємо останній стан і підказку
+    if (state) { toast = 'Немає звʼязку із сервером. Спробуйте ще раз.'; render(state); }
+    else render({error:'Немає звʼязку із сервером. Перевірте інтернет.'});
+    return;
+  }
+  if (!r.ok) { render({error: j && j.error==='not_member' ? 'Спершу підключіться до бота за посиланням-запрошенням.' : 'Не вдалося завантажити. Спробуйте ще раз.'}); return; }
+  // до 05:00 сервер віддає дитині вчорашній вечір, тож дату беремо з відповіді
+  state = j; if (!date) date = j.role==='parent' ? j.detail.date : j.date;
+  render(j);
 }
 
 function goalCard(k) {
@@ -204,7 +218,8 @@ let pamt = null;
 function render(j) {
   const app = document.getElementById('app');
   if (j.error) { app.innerHTML = `<div class="err">${esc(j.error)}</div>`; return; }
-  app.innerHTML = j.role === 'parent' ? parentHTML(j) : (j.note ? `<div class="note">${esc(j.note)}</div>` : '') + kidHTML(j, 'kid');
+  const t = toast ? `<div class="err">${esc(toast)}</div>` : ''; toast = '';
+  app.innerHTML = t + (j.role === 'parent' ? parentHTML(j) : (j.note ? `<div class="note">${esc(j.note)}</div>` : '') + kidHTML(j, 'kid'));
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b || busy || b.disabled) return;
