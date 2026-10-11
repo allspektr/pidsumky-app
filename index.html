@@ -86,29 +86,36 @@ const shortD = d => { const x = new Date(d+'T12:00:00Z'); return DN[x.getUTCDay(
 const ICON = {auto:'☀️', self:'', timed:'📚', screen:'🎮', parent:'🌙'};
 
 let toast = ''; // коротке повідомлення над екраном (напр. про обрив зв'язку)
+let diag = null;  // що сталося з попереднім обірваним запитом — сервер запише в лог
+const drafts = {}; // чернетки похвали за дитиною: не губляться, якщо збереження не пройшло
+// дії, які безпечно повторити (результат той самий, скільки разів не надішли)
+const SAFE = new Set(['app_state','app_p_praise','app_p_toggle','app_toggle','app_screen','app_p_news','app_p_chore_price','app_p_task_ok']);
 async function call(action, extra={}) {
   if (!tg || !tg.initData) { render({error:'Відкрийте цю сторінку з бота @Pidsumky_bot.'}); return; }
   busy = true;
-  const send = () => fetch(API, {method:'POST', headers:{'content-type':'application/json','x-tg-init-data':tg.initData}, body:JSON.stringify({action, date, kid:pkid, ...extra})});
+  const send = () => { const body = JSON.stringify({action, date, kid:pkid, ...extra, ...(diag ? {diag} : {})}); return fetch(API, {method:'POST', headers:{'content-type':'application/json','x-tg-init-data':tg.initData}, body}); };
   let r = null, j = null;
-  try { r = await send(); j = await r.json(); }
-  catch(e) {
-    // запит обірвався (мобільний зв'язок, згорнутий Telegram): дія могла й зберегтися,
-    // тому не повторюємо її, а через секунду просто перечитуємо стан
-    r = null; action = 'app_state'; extra = {};
-    try { await new Promise(res => setTimeout(res, 1000)); r = await send(); j = await r.json(); toast = 'Звʼязок перервався. Перевірте, чи збереглось.'; }
-    catch(e2) { r = null; }
+  for (let attempt = 0; attempt < 3 && !r; attempt++) {
+    try { r = await send(); j = await r.json(); diag = null; }
+    catch(e) {
+      r = null;
+      diag = {err: String(e && e.message || e).slice(0, 120), act: action, try: attempt + 1, at: new Date().toISOString()};
+      // небезпечну дію не повторюємо (могла вже зберегтися) — лише перечитуємо стан
+      if (!SAFE.has(action)) { action = 'app_state'; extra = {}; }
+      await new Promise(res => setTimeout(res, 1200 * (attempt + 1)));
+    }
   }
   busy = false;
   if (!r) {
     // екран не стираємо: показуємо останній стан і підказку
-    if (state) { toast = 'Немає звʼязку із сервером. Спробуйте ще раз.'; render(state); }
+    if (state) { toast = 'Немає звʼязку із сервером. Спробуйте ще раз — набране не загубилось.'; render(state); }
     else render({error:'Немає звʼязку із сервером. Перевірте інтернет.'});
     return;
   }
   if (!r.ok) { render({error: j && j.error==='not_member' ? 'Спершу підключіться до бота за посиланням-запрошенням.' : 'Не вдалося завантажити. Спробуйте ще раз.'}); return; }
   // до 05:00 сервер віддає дитині вчорашній вечір, тож дату беремо з відповіді
   state = j; if (!date) date = j.role==='parent' ? j.detail.date : j.date;
+  if (j.role === 'parent') { const my = (j.detail.praise||{})[j.pkey]; if (my && drafts[j.detail.kid] === my.why) delete drafts[j.detail.kid]; }
   render(j);
 }
 
@@ -208,7 +215,7 @@ function parentHTML(j) {
     <section class="card"><h2>Нове цього тижня</h2>${news}</section>
     <section class="card"><h2>Ваша похвала</h2><div class="muted" style="font-size:13px">До ${pr} ₴ від кожного з батьків. Тільки плюс і з поясненням: ${esc(d.name)} його прочитає.</div>
      <div class="pick" style="margin:0">${[0,Math.round(pr/2),pr].map(v=>`<button data-act="pamt" data-v="${v}" aria-pressed="${(my.amt||0)===v}" ${w.approved?'disabled':''}>${v} ₴</button>`).join('')}</div>
-     <input class="why" id="why" placeholder="За що саме? Конкретна дія" value="${esc(my.why||'')}" ${w.approved?'disabled':''}>
+     <input class="why" id="why" placeholder="За що саме? Конкретна дія" value="${esc(drafts[d.kid] ?? my.why ?? '')}" ${w.approved?'disabled':''}>
      ${w.approved?'':'<button class="ghost" data-act="psave">Зберегти похвалу</button>'}</section>
     <section class="card"><div class="row"><h2>Тиждень</h2><span class="big" style="font-size:22px">${uah(w.approved?w.paid:w.total)}</span></div>${streakHTML(w)}
      <div class="lines">${lines.map(([t,v])=>`<div class="l"><span>${t}</span><span class="v">${uah(v)}</span></div>`).join('')}</div>${approve}</section>
@@ -235,7 +242,7 @@ document.addEventListener('click', e => {
   if (a==='pset') call('app_p_toggle', {habit:b.dataset.h, ok: v==='1'});
   if (a==='pnews') call('app_p_news', {id:b.dataset.id, ok: v==='1'});
   if (a==='pamt') { pamt = Number(v); document.querySelectorAll('[data-act=pamt]').forEach(x=>x.setAttribute('aria-pressed', x===b)); }
-  if (a==='psave') { const my = (state.detail.praise||{})[state.pkey]||{}; call('app_p_praise', {amt: pamt ?? (my.amt||0), why: document.getElementById('why').value}); }
+  if (a==='psave') { const my = (state.detail.praise||{})[state.pkey]||{}, why = document.getElementById('why').value; drafts[state.detail.kid] = why; call('app_p_praise', {amt: pamt ?? (my.amt||0), why}); }
   if (a==='papprove') { if (b.dataset.confirm) call('app_p_approve'); else { b.dataset.confirm = '1'; b.textContent = 'Натисніть ще раз, щоб підтвердити'; } }
   if (a==='task') call('app_task_'+b.dataset.a, {id: b.dataset.id});
   if (a==='ptask') call('app_p_task_ok', {claim: b.dataset.id, ok: v==='1', how: b.dataset.how});
