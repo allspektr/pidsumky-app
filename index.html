@@ -187,14 +187,14 @@ function weekCard(k) {
   return `<section class="card"><div class="lbl">Цього тижня</div><div class="row"><span class="big">${uah(w.total)}</span><span class="muted">з ${uah(w.max)}</span></div>
   ${streakHTML(w)}
   <div class="muted" style="font-size:13px">${w.clean?`Пропусків ${w.misses} з 2 дозволених: серійний бонус поки твій 🔥`:`Пропусків ${w.misses}: серійний бонус цього тижня згорів`}</div>
-  <div class="wk">${w.rows.map(r=>`<span>${esc(r.t)}</span><span class="v ${r.done===r.sch?'full':''}">${r.done}/${r.sch}</span>`).join('')}</div>
-  <div class="muted" style="font-size:13px;margin-top:10px;line-height:1.5"><b>Як складається сума</b><br>🛡 ${uah(w.parts.base)} гарантовано щотижня<br>✅ за кожен виконаний пункт: сума біля нього<br>⭐ +${r.perfect} ₴ за звичку без жодного пропуску за тиждень<br>🔥 серійний бонус: +${w.streak.join(' / +')} ₴ (росте, якщо тижні без пропусків ідуть поспіль)<br>✨ +${r.news} ₴ дізнався нове · +${r.news} ₴ спробував нове · +${r.book} ₴ за книжку<br>👍 до +${r.praise} ₴ похвала від мами і до +${r.praise} ₴ від тата<br>🧹 задачі: сума біля кожної, після підтвердження батьків${w.parts.chores?` (цього тижня ${uah(w.parts.chores)})`:''}</div></section>`;
+  <div class="wk">${w.rows.map(r=>`<span>${esc(r.t)}</span><span class="v ${r.done===r.sch?'full':''}">${r.done}/${r.sch}${r.extra?` +${r.extra}`:''}</span>`).join('')}</div>
+  <div class="muted" style="font-size:13px;margin-top:10px;line-height:1.5"><b>Як складається сума</b><br>🛡 ${uah(w.parts.base)} гарантовано щотижня<br>✅ за кожен виконаний пункт: сума біля нього<br>🌴 у вихідні все за бажанням: зроблене оплачується, невиконане — не пропуск<br>+N біля звички — дні за бажанням, коли теж зробив<br>⭐ +${r.perfect} ₴ за звичку без жодного пропуску за тиждень<br>🔥 серійний бонус: +${w.streak.join(' / +')} ₴ (росте, якщо тижні без пропусків ідуть поспіль)<br>✨ +${r.news} ₴ дізнався нове · +${r.news} ₴ спробував нове · +${r.book} ₴ за книжку<br>👍 до +${r.praise} ₴ похвала від мами і до +${r.praise} ₴ від тата<br>🧹 задачі: сума біля кожної, після підтвердження батьків${w.parts.chores?` (цього тижня ${uah(w.parts.chores)})`:''}</div></section>`;
 }
 function kidHTML(k, mode) {
   const yday = addD(k.today, -1);
   const seg = mode==='kid' ? `<div class="seg"><button data-act="day" data-v="${k.today}" aria-pressed="${date===k.today}">Сьогодні</button><button data-act="day" data-v="${yday}" aria-pressed="${date===yday}">Вчора</button></div>` : '';
   return `<div class="lbl" style="padding:0 4px">Твій день · ${esc(k.name)}</div>` + goalCard(k) + seg + `
-    <section class="card">${k.approved?'<div class="muted">🔒 Тиждень підтверджено</div>':''}${itemsHTML(k, mode)}
+    <section class="card">${k.approved?'<div class="muted">🔒 Тиждень підтверджено</div>':''}${k.relaxed?'<div class="note">🌴 Вихідний: усе за бажанням — зробив, отримав гроші; ні — не пропуск.</div>':''}${itemsHTML(k, mode)}
     ${k.pc&&k.date===k.today?`<div class="muted" style="font-size:13px">🖥 Твій ПК сьогодні: ігри ${mins(k.pc.game)} · соцмережі ${mins(k.pc.social)} · навчання ${mins(k.pc.study)} (бачиш тільки ти)</div>`:''}</section>` + tasksCard(k, mode==='view') + weekCard(k);
 }
 function parentHTML(j) {
@@ -206,7 +206,7 @@ function parentHTML(j) {
   const news = d.news.length ? d.news.map(n=>`<div class="nrow"><span class="tx"><span class="k">${n.type==='learn'?'дізнався':n.type==='try'?'спробував':'дочитав книжку'}</span>${esc(n.text)}</span><span class="pick" style="margin:0">${w.approved?(n.ok===true?'✅':n.ok===false?'❌':'—'):`<button data-act="pnews" data-id="${n.id}" data-v="1" aria-pressed="${n.ok===true}">✅</button><button data-act="pnews" data-id="${n.id}" data-v="0" aria-pressed="${n.ok===false}">❌</button>`}</span></div>`).join('') : `<div class="muted" style="font-size:14px">${esc(d.name)} ще нічого не додав. Він додає це в боті: «✨ Нове».</div>`;
   const p = w.parts;
   const lines = [['Базова',p.base],['Звички',p.habits],['Без пропусків',p.perfect],['Серійний бонус',p.streak],['Нове',p.news],['Книжки',p.books],['Похвала',p.praise],['Задачі',p.chores||0]];
-  const approve = w.approved ? `<div class="note">✅ Тиждень підтверджено: ${uah(w.paid)}</div>` : w.complete ? `<button class="cta" data-act="papprove">Підтвердити тиждень · ${uah(w.total)}</button>` : `<div class="muted" style="font-size:13px">Підтвердити можна в неділю або пізніше.</div>`;
+  const approve = w.approved ? `<div class="note">✅ Тиждень підтверджено: ${uah(w.paid)}</div>` : w.complete ? `<button class="cta" data-act="papprove">Підтвердити тиждень · ${uah(w.total)}</button>` : `<div class="muted" style="font-size:13px">Підтвердити можна з понеділка, коли тиждень закінчиться.</div>`;
   return `<div class="row" style="padding:0 4px"><h1>Керування</h1><span class="lbl">${esc(j.name)}</span></div>` + sw +
     (j.note ? `<div class="note">${esc(j.note)}</div>` : '') + goalCard(d) +
     `<section class="card"><div class="row"><h2>Відмітки · ${shortD(d.date)}</h2>${d.approved?'<span class="lbl">🔒</span>':''}</div>${strip}${itemsHTML(d,'parent')}
