@@ -122,14 +122,16 @@ async function call(action, extra={}) {
 function goalCard(k) {
   const p = k.piggy;
   if (!p.goal) return `<section class="card"><div class="lbl">Скарбничка · ${esc(k.name)}</div><div class="big">${uah(p.bal)}</div><div class="muted">Ціль ще не обрана</div></section>`;
-  const tot = p.total ?? p.bal; // свої + обіцяна доплата батьків (платять при купівлі)
+  // головна цифра — власні гроші дитини; доплата батьків (при купівлі) — окремо, щоб не плутати
+  const tot = p.total ?? p.bal;
   const pct = Math.min(100, tot/p.goal*100), step = p.goal >= 20000 ? 10000 : 0, marks = [];
   if (step) for (let v = step; v < p.goal; v += step) marks.push(v);
   const left = Math.max(0, p.goal - tot);
   const eta = left===0 ? 'Ціль досягнута! 🎉' : p.avg > 0 ? '≈ '+Math.ceil(left/p.avg)+' тиж. у такому темпі' : 'прогноз після першого тижня';
-  return `<section class="card"><div class="row"><div><div class="lbl">${esc(k.name)} збирає на</div><h1>${esc(p.goal_name||'Ціль')}</h1></div><div class="num" style="font-size:18px;font-weight:600">${uah(tot)}<span class="muted" style="font-size:12px"> / ${uah(p.goal)}</span></div></div>
+  return `<section class="card"><div class="row"><div><div class="lbl">${esc(k.name)} збирає на</div><h1>${esc(p.goal_name||'Ціль')}</h1></div><div style="text-align:right"><div class="lbl">у скарбничці</div><div class="num" style="font-size:20px;font-weight:600">${uah(p.bal)}</div></div></div>
   <div class="bar"><i style="width:${pct}%"></i>${marks.map(v=>`<s style="left:${v/p.goal*100}%"></s>`).join('')}</div>
-  <div class="row muted" style="font-size:13px"><span>${Math.round(pct)}%</span><span>${eta}</span></div>${p.promised?`<div class="muted" style="font-size:13px">💪 твої ${uah(p.bal)} + батьки докладуть ${uah(p.promised)} при купівлі</div>`:''}</section>`;
+  <div class="row muted" style="font-size:13px"><span>${p.promised?'з доплатою батьків: ':''}${uah(tot)} з ${uah(p.goal)}</span><span>${eta}</span></div>
+  ${p.promised?`<div class="muted" style="font-size:13px">💪 Твої ${uah(p.bal)} + батьки додадуть ще ${uah(p.promised)}, коли купуватимете ${esc((p.goal_name||'ціль').toLowerCase())}</div>`:''}</section>`;
 }
 // сума за один виконаний день звички приходить із сервера (вага × ставка)
 const rw = it => it.reward != null ? `<span class="rw">+${it.reward} ₴</span>` : '';
