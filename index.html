@@ -154,12 +154,21 @@ function itemsHTML(k, mode) { // mode: 'kid' | 'parent' | 'view'
     return `<button class="item ${cls}" ${act || 'disabled'}><span class="box">${mark}</span><span><span class="t">${esc(it.t)}</span>${rw(it)}<br><span class="s">${esc(it.status)}${by}${verb}</span></span></button>`;
   }).join('');
 }
+// задачі за вибраний день: що зробив / чекає / відмовився
+const DTS = {ok:'✅ зараховано', wait:'⏳ чекає підтвердження', no:'❌ не зараховано', declined:'відмовився'};
+function dayTasksHTML(k) {
+  const L = (k.dayTasks||[]);
+  if (!L.length) return '';
+  return `<div class="lbl" style="margin-top:4px">🧹 Задачі за день</div>${L.map(x=>`<div class="nrow"><span class="tx">${esc(x.title)}<span class="k">${DTS[x.st]||''}${x.st==='ok'&&x.by?' · '+esc(x.by):''}</span></span><span class="v num">${x.st==='ok'?'+'+uah(x.amount):''}</span></div>`).join('')}`;
+}
 let tmode = 'first'; // режим нового завдання від батьків
 const TBTN = {take:'🙋 Беру', done:'✅ Виконав', no:'❌ Не виконав', drop:'↩️ Відмовитись'};
 function tasksCard(k, view) {
-  if (!k.tasks || !k.tasks.length) return '';
+  const doneToday = (k.dayTasks||[]).filter(x=>x.st==='ok'||x.st==='wait').filter(x=>!(k.tasks||[]).some(t=>t.title===x.title));
+  const doneHTML = doneToday.length ? `<div class="muted" style="font-size:13px">Сьогодні вже: ${doneToday.map(x=>`${x.st==='ok'?'✅':'⏳'} ${esc(x.title)}`).join(' · ')}</div>` : '';
+  if (!k.tasks || !k.tasks.length) return doneHTML ? `<section class="card"><h2>🧹 Задачі</h2>${doneHTML}</section>` : '';
   const dis = view ? ' disabled' : '';
-  return `<section class="card"><h2>🧹 Задачі</h2><div class="muted" style="font-size:13px">Додаткові гроші. Зараховують батьки, коли перевірять.</div>${k.tasks.map(t=>`<div class="item ${t.choice==='done'?'ok':t.choice==='no'?'no':''}"><span class="box">${t.choice==='done'?'✓':t.choice==='no'?'✕':'🧹'}</span><span><span class="t">${esc(t.title)}</span><span class="rw">+${t.price} ₴</span><br><span class="s">${t.mode==='pair'?'удвох — навпіл · ':t.daily?'':'від батьків · '}${esc(t.state)}</span>${t.acts.length?`<span class="pick">${t.acts.map(a=>`<button data-act="task" data-a="${a}" data-id="${t.id}" aria-pressed="${t.choice===a}"${dis}>${TBTN[a]}</button>`).join('')}</span>`:''}</span></div>`).join('')}</section>`;
+  return `<section class="card"><h2>🧹 Задачі</h2><div class="muted" style="font-size:13px">Додаткові гроші. Зараховують батьки, коли перевірять.</div>${doneHTML}${k.tasks.map(t=>`<div class="item ${t.choice==='done'?'ok':t.choice==='no'?'no':''}"><span class="box">${t.choice==='done'?'✓':t.choice==='no'?'✕':'🧹'}</span><span><span class="t">${esc(t.title)}</span><span class="rw">+${t.price} ₴</span><br><span class="s">${t.mode==='pair'?'удвох — навпіл · ':t.daily?'':'від батьків · '}${esc(t.state)}</span>${t.acts.length?`<span class="pick">${t.acts.map(a=>`<button data-act="task" data-a="${a}" data-id="${t.id}" aria-pressed="${t.choice===a}"${dis}>${TBTN[a]}</button>`).join('')}</span>`:''}</span></div>`).join('')}</section>`;
 }
 function ptasksHTML(T) {
   if (!T) return '';
@@ -212,6 +221,7 @@ function parentHTML(j) {
   return `<div class="row" style="padding:0 4px"><h1>Керування</h1><span class="lbl">${esc(j.name)}</span></div>` + sw +
     (j.note ? `<div class="note">${esc(j.note)}</div>` : '') + goalCard(d) +
     `<section class="card"><div class="row"><h2>Відмітки · ${shortD(d.date)}</h2>${d.approved?'<span class="lbl">🔒</span>':''}</div>${strip}${itemsHTML(d,'parent')}
+     ${dayTasksHTML(d)}
      <div class="muted" style="font-size:13px">${d.approved?'Тиждень підтверджено, зміни закрито.':'Для кожного пункту виберіть: виконав чи ні. Екранний час оцінює сам '+esc(d.name)+'.'}</div></section>
     ${ptasksHTML(j.tasks)}
     <section class="card"><h2>Нове цього тижня</h2>${news}</section>
