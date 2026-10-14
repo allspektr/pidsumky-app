@@ -89,7 +89,7 @@ let toast = ''; // коротке повідомлення над екраном
 let diag = null;  // що сталося з попереднім обірваним запитом — сервер запише в лог
 const drafts = {}; // чернетки похвали за дитиною: не губляться, якщо збереження не пройшло
 // дії, які безпечно повторити (результат той самий, скільки разів не надішли)
-const SAFE = new Set(['app_state','app_p_praise','app_p_toggle','app_toggle','app_screen','app_p_news','app_p_chore_price','app_p_task_ok']);
+const SAFE = new Set(['app_state','app_p_praise','app_p_toggle','app_toggle','app_screen','app_p_news','app_p_chore_price','app_p_task_ok','app_p_habit_day']);
 async function call(action, extra={}) {
   if (!tg || !tg.initData) { render({error:'Відкрийте цю сторінку з бота @Pidsumky_bot.'}); return; }
   busy = true;
@@ -161,6 +161,11 @@ function dayTasksHTML(k) {
   if (!L.length) return '';
   return `<div class="lbl" style="margin-top:4px">🧹 Задачі за день</div>${L.map(x=>`<div class="nrow"><span class="tx">${esc(x.title)}<span class="k">${DTS[x.st]||''}${x.st==='ok'&&x.by?' · '+esc(x.by):''}</span></span><span class="v num">${x.st==='ok'?'+'+uah(x.amount):''}</span></div>`).join('')}`;
 }
+// розклад дня: додати додаткове тренування / скасувати
+function flexHTML(k) {
+  if (!k.flex || !k.flex.length || k.approved) return '';
+  return `<div class="lbl" style="margin-top:4px">📅 Розклад цього дня</div><div class="pick" style="margin:0;flex-wrap:wrap">${k.flex.map(f=>`<button data-act="pflex" data-h="${f.k}" data-v="${f.on?0:1}">${f.on?'− '+esc(f.t)+' (скасувати)':'+ '+esc(f.t)}</button>`).join('')}</div>`;
+}
 let tmode = 'first'; // режим нового завдання від батьків
 const TBTN = {take:'🙋 Беру', done:'✅ Виконав', no:'❌ Не виконав', drop:'↩️ Відмовитись'};
 function tasksCard(k, view) {
@@ -222,6 +227,7 @@ function parentHTML(j) {
     (j.note ? `<div class="note">${esc(j.note)}</div>` : '') + goalCard(d) +
     `<section class="card"><div class="row"><h2>Відмітки · ${shortD(d.date)}</h2>${d.approved?'<span class="lbl">🔒</span>':''}</div>${strip}${itemsHTML(d,'parent')}
      ${dayTasksHTML(d)}
+     ${flexHTML(d)}
      <div class="muted" style="font-size:13px">${d.approved?'Тиждень підтверджено, зміни закрито.':'Для кожного пункту виберіть: виконав чи ні. Екранний час оцінює сам '+esc(d.name)+'.'}</div></section>
     ${ptasksHTML(j.tasks)}
     <section class="card"><h2>Нове цього тижня</h2>${news}</section>
@@ -258,6 +264,7 @@ document.addEventListener('click', e => {
   if (a==='papprove') { if (b.dataset.confirm) call('app_p_approve'); else { b.dataset.confirm = '1'; b.textContent = 'Натисніть ще раз, щоб підтвердити'; } }
   if (a==='task') call('app_task_'+b.dataset.a, {id: b.dataset.id});
   if (a==='ptask') call('app_p_task_ok', {claim: b.dataset.id, ok: v==='1', how: b.dataset.how});
+  if (a==='pflex') call('app_p_habit_day', {habit: b.dataset.h, on: v==='1'});
   if (a==='tmode') { tmode = v; document.querySelectorAll('[data-act=tmode]').forEach(x=>x.setAttribute('aria-pressed', x===b)); }
   if (a==='pcancel') { if (b.dataset.confirm) call('app_p_task_cancel', {id: b.dataset.id}); else { b.dataset.confirm = '1'; b.textContent = 'Точно?'; } }
   if (a==='pprice') call('app_p_chore_price', {id: b.dataset.id, price: Number(document.querySelector(`[data-cprice="${b.dataset.id}"]`).value)});
