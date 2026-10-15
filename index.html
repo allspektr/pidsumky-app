@@ -90,7 +90,9 @@ let diag = null;  // що сталося з попереднім обірван�
 const drafts = {}; // чернетки похвали за дитиною: не губляться, якщо збереження не пройшло
 // дії, які безпечно повторити (результат той самий, скільки разів не надішли)
 const SAFE = new Set(['app_state','app_p_praise','app_p_toggle','app_toggle','app_screen','app_p_news','app_p_chore_price','app_p_task_ok','app_p_habit_day','app_p_task_credit']);
+let lastAction = '';
 async function call(action, extra={}) {
+  lastAction = action;
   if (!tg || !tg.initData) { render({error:'Відкрийте цю сторінку з бота @Pidsumky_bot.'}); return; }
   busy = true;
   const send = () => { const body = JSON.stringify({action, date, kid:pkid, ...extra, ...(diag ? {diag} : {})}); return fetch(API, {method:'POST', headers:{'content-type':'application/json','x-tg-init-data':tg.initData}, body}); };
@@ -115,6 +117,7 @@ async function call(action, extra={}) {
   if (!r.ok) { render({error: j && j.error==='not_member' ? 'Спершу підключіться до бота за посиланням-запрошенням.' : 'Не вдалося завантажити. Спробуйте ще раз.'}); return; }
   // до 05:00 сервер віддає дитині вчорашній вечір, тож дату беремо з відповіді
   state = j; if (!date) date = j.role==='parent' ? j.detail.date : j.date;
+  taskNote = j.role === 'parent' && /^app_p_(task|chore)/.test(lastAction) ? (j.note || '') : '';
   if (j.role === 'parent') { const my = (j.detail.praise||{})[j.pkey]; if (my && drafts[j.detail.kid] === my.why) delete drafts[j.detail.kid]; }
   render(j);
 }
@@ -166,7 +169,8 @@ function flexHTML(k) {
   if (!k.flex || !k.flex.length || k.approved) return '';
   return `<div class="lbl" style="margin-top:4px">📅 Розклад цього дня</div><div class="pick" style="margin:0;flex-wrap:wrap">${k.flex.map(f=>`<button data-act="pflex" data-h="${f.k}" data-v="${f.on?0:1}">${f.on?'− '+esc(f.t)+' (скасувати)':'+ '+esc(f.t)}</button>`).join('')}</div>`;
 }
-let tmode = 'first'; // режим нового завдання від батьків
+let tmode = 'first';
+let taskNote = ''; // підтвердження дії із задачами — показуємо в самій картці, біля кнопки // режим нового завдання від батьків
 const TBTN = {take:'🙋 Беру', done:'✅ Виконав', no:'❌ Не виконав', drop:'↩️ Відмовитись'};
 function tasksCard(k, view) {
   const doneToday = (k.dayTasks||[]).filter(x=>x.st==='ok'||x.st==='wait').filter(x=>!(k.tasks||[]).some(t=>t.title===x.title));
@@ -194,6 +198,7 @@ function ptasksHTML(T) {
     <input class="why" id="ttitle" placeholder="Назва свого завдання">
     <div class="row" style="flex-wrap:nowrap"><input class="why" id="tprice" type="number" inputmode="numeric" value="${T.def}" style="width:100px"><label class="muted" style="font-size:13px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="tsave"> запам'ятати в списку</label></div>
     <button class="cta" data-act="ppost">Опублікувати</button>
+    ${taskNote ? `<div class="note">${esc(taskNote)}</div>` : ''}
     <details><summary class="muted" style="font-size:14px">Ціни за замовчуванням</summary>${prices}</details></section>`;
 }
 function streakHTML(w) {
@@ -225,7 +230,7 @@ function parentHTML(j) {
   const lines = [['Базова',p.base],['Звички',p.habits],['Без пропусків',p.perfect],['Серійний бонус',p.streak],['Нове',p.news],['Книжки',p.books],['Похвала',p.praise],['Задачі',p.chores||0]];
   const approve = w.approved ? `<div class="note">✅ Тиждень підтверджено: ${uah(w.paid)}</div>` : w.complete ? `<button class="cta" data-act="papprove">Підтвердити тиждень · ${uah(w.total)}</button>` : `<div class="muted" style="font-size:13px">Підтвердити можна з понеділка, коли тиждень закінчиться.</div>`;
   return `<div class="row" style="padding:0 4px"><h1>Керування</h1><span class="lbl">${esc(j.name)}</span></div>` + sw +
-    (j.note ? `<div class="note">${esc(j.note)}</div>` : '') + goalCard(d) +
+    (j.note && !taskNote ? `<div class="note">${esc(j.note)}</div>` : '') + goalCard(d) +
     `<section class="card"><div class="row"><h2>Відмітки · ${shortD(d.date)}</h2>${d.approved?'<span class="lbl">🔒</span>':''}</div>${strip}${itemsHTML(d,'parent')}
      ${dayTasksHTML(d)}
      ${flexHTML(d)}
