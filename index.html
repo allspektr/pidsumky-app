@@ -105,7 +105,7 @@ let toast = ''; // коротке повідомлення над екраном
 let diag = null;  // що сталося з попереднім обірваним запитом — сервер запише в лог
 const drafts = {}; // чернетки похвали за дитиною: не губляться, якщо збереження не пройшло
 // дії, які безпечно повторити (результат той самий, скільки разів не надішли)
-const BUILD = '18'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
+const BUILD = '19'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
 const SAFE = new Set(['app_state','app_p_praise','app_p_toggle','app_toggle','app_screen','app_p_news','app_p_chore_price','app_p_task_ok','app_p_habit_day','app_p_task_credit']);
 let lastAction = '';
 async function call(action, extra={}) {
@@ -223,12 +223,16 @@ function praiseBlock(pr, notes) {
   return L.join('');
 }
 // ✨ Нове — дізнався / спробував / дочитав книжку
-let newsType = 'learn';
+let newsType = '';
 const NEWS_T = {learn:'💡 Дізнався нове', try:'🧪 Спробував нове', book:'📚 Дочитав книжку'};
-function newsCardKid(view) {
-  return `<section class="card" id="blk-news"><details><summary>✨ Нове: дізнався, спробував, дочитав книжку — +50 ₴</summary>
-    <div class="chips" style="margin:8px 0">${Object.keys(NEWS_T).map(t=>`<button data-act="ntype" data-v="${t}" aria-pressed="${newsType===t}">${NEWS_T[t]}</button>`).join('')}</div>
-    <textarea class="why" id="newstext" placeholder="Що саме? Коротко"${view?' disabled':''}></textarea><button class="ghost" data-act="news"${view?' disabled':''}>Надіслати батькам</button></details></section>`;
+const NEWS_Q = {learn:'Що нового дізнався? Коротко, одним реченням', try:'Що нового спробував?', book:'Яку книжку дочитав? Батьки поставлять 3 питання'};
+function newsCardKid(k, view) {
+  const mine = (k.news||[]);
+  const list = mine.length ? mine.map(n=>`<div class="nrow"><span class="tx"><span class="k">${n.type==='learn'?'дізнався':n.type==='try'?'спробував':'книжка'}</span>${esc(n.text)}</span><span class="v num">${n.ok===true?'+'+uah(n.amount||0):n.ok===false?'❌':'⏳'}</span></div>`).join('') : '';
+  return `<section class="card" id="blk-news"><div class="row"><h2>✨ Нове</h2><span class="sub">10–100 ₴ — вирішують батьки</span></div>
+    <div class="pick" style="margin:0;flex-wrap:wrap">${Object.keys(NEWS_T).map(t=>`<button data-act="ntype" data-v="${t}" aria-pressed="${newsType===t}"${view?' disabled':''}>${NEWS_T[t]}</button>`).join('')}</div>
+    ${newsType ? `<div class="sub">${NEWS_Q[newsType]}</div><textarea class="why" id="newstext" placeholder="Напиши тут…"${view?' disabled':''}></textarea><button class="ghost" data-act="news"${view?' disabled':''}>Надіслати батькам</button>` : ''}
+    ${list}</section>`;
 }
 function praiseCardKid(k, view) {
   const body = praiseBlock(k.praise, k.notes) || '<div class="sub">Цього тижня похвали ще немає</div>';
@@ -261,12 +265,12 @@ function weekCard(k) {
   ${streakHTML(w)}
   <div class="sub">${w.clean?`пропусків ${w.misses} з 2 — серія жива 🔥`:`пропусків ${w.misses} — серія цього тижня згоріла`}</div>
   <details><summary>Деталі</summary><div class="wk" style="margin-top:8px">${w.rows.map(r=>`<span>${esc(r.t)}</span><span class="v ${r.done===r.sch?'full':''}">${r.done}/${r.sch}${r.extra?` +${r.extra}`:''}</span>`).join('')}</div>
-  <div class="sub" style="margin-top:10px;line-height:1.6">🛡 ${uah(w.parts.base)} база · ⭐ +${r.perfect} ₴ звичка без пропусків · 🔥 серія +${w.streak.join('/')} ₴ · ✨ нове +${r.news} ₴, книжка +${r.book} ₴ · 👍 похвала до +${r.praise} ₴ від кожного · 🧹 задачі ${w.parts.chores?uah(w.parts.chores):'—'}</div></details></section>`;
+  <div class="sub" style="margin-top:10px;line-height:1.6">🛡 ${uah(w.parts.base)} база · ⭐ +${r.perfect} ₴ звичка без пропусків · 🔥 серія +${w.streak.join('/')} ₴ · ✨ нове й книжки: 10–100 ₴ за кожне, вирішують батьки · 👍 похвала до +${r.praise} ₴ від кожного · 🧹 задачі ${w.parts.chores?uah(w.parts.chores):'—'}</div></details></section>`;
 }
 function kidHTML(k, mode) {
   const yday = addD(k.today, -1);
   const seg = mode==='kid' ? `<div class="seg"><button data-act="day" data-v="${k.today}" aria-pressed="${date===k.today}">Сьогодні</button><button data-act="day" data-v="${yday}" aria-pressed="${date===yday}">Вчора</button></div>` : '';
-  return `<div class="lbl" style="padding:0 4px">Твій день · ${esc(k.name)}</div>` + goalCard(k) + seg + habitsCard(k, mode) + tasksCard(k, mode==='view') + newsCardKid(mode==='view') + praiseCardKid(k, mode==='view') + weekCard(k);
+  return `<div class="lbl" style="padding:0 4px">Твій день · ${esc(k.name)}</div>` + goalCard(k) + seg + habitsCard(k, mode) + tasksCard(k, mode==='view') + newsCardKid(k, mode==='view') + praiseCardKid(k, mode==='view') + weekCard(k);
 }
 // 🧹 Задачі — батьки: «чекають рішення» (хто натиснув) і «відкриті» (ніхто не натискав); частка — біля конкретної задачі
 const SHARE_L = {1:'100%', 0.75:'¾', 0.5:'½', 0.25:'¼'};
@@ -303,7 +307,7 @@ function reviewHTML(j) {
   const rows = d.grid.map(h=>`<div class="grid"><span class="nm">${esc(h.t)}</span>${h.cells.map(c=>!c?'<span class="c"></span>':c.can?`<button data-act="rcell" data-h="${h.k}" data-d="${c.d}" data-v="${c.v===true?0:1}" class="${c.v===true?'ok':c.v===false?'no':c.opt?'opt':'none'}">${c.v===true?'✓':c.v===false?'✕':c.opt?'·':'?'}</button>`:`<span class="c ${c.v===true?'ok':c.v===false?'no':''}" style="opacity:1">${c.v===true?'✓':c.v===false?'✕':''}</span>`).join('')}</div>`).join('');
   const legend = `<div class="sub">? — без відмітки (жовте), натисніть, щоб поставити ✓ або ✕ · «·» — вихідний за бажанням</div>`;
   const chores = (w.chores||[]).length ? `<div class="lbl">🧹 Задачі · ${uah(p.chores)}</div>${w.chores.map(x=>`<div class="nrow"><span class="tx">${shortD(x.day)} · ${esc(x.title)}${x.share<1?' · '+Math.round(x.share*100)+'%':''}</span><span class="v num">+${uah(x.amount)}</span></div>`).join('')}` : '';
-  const news = d.news.length ? `<div class="lbl">✨ Нове</div>${d.news.map(n=>`<div class="nrow"><span class="tx"><span class="k">${n.type==='learn'?'дізнався':n.type==='try'?'спробував':'книжка'}</span>${esc(n.text)}</span><span class="pick" style="margin:0">${w.approved?(n.ok===true?'✅':n.ok===false?'❌':'—'):`<button data-act="pnews" data-id="${n.id}" data-v="1" aria-pressed="${n.ok===true}">✅</button><button data-act="pnews" data-id="${n.id}" data-v="0" aria-pressed="${n.ok===false}">❌</button>`}</span></div>`).join('')}` : '';
+  const news = d.news.length ? `<div class="lbl">✨ Нове</div>${d.news.map(n=>`<div class="nrow"><span class="tx"><span class="k">${n.type==='learn'?'дізнався':n.type==='try'?'спробував':'книжка'}</span>${esc(n.text)}</span><span class="pick" style="margin:0;flex-wrap:wrap">${w.approved?(n.ok===true?'✅ '+uah(n.amount||0):n.ok===false?'❌':'—'):n.ok===true?`<span class="sub">✅ ${uah(n.amount||0)}</span><button data-act="pnews" data-id="${n.id}" data-v="0">✕</button>`:`${[10,25,50,75,100].map(a=>`<button data-act="pnews" data-id="${n.id}" data-v="1" data-amt="${a}" aria-pressed="${n.ok===true&&n.amount===a}">${a}</button>`).join('')}<button data-act="pnews" data-id="${n.id}" data-v="0" aria-pressed="${n.ok===false}">❌</button>`}</span></div>`).join('')}` : '';
   const praise = praiseBlock(d.praise, d.notes);
   const lines = [['База',p.base],['Звички',p.habits],['Без пропусків',p.perfect],['Серія',p.streak],['Нове',p.news],['Книжки',p.books],['Похвала',p.praise],['Задачі',p.chores||0]];
   const approve = w.approved ? `<div class="note">✅ Підтверджено: ${uah(w.paid)}</div>` : w.complete ? `<button class="cta" data-act="papprove">Підтвердити тиждень · ${uah(w.total)}</button>` : `<div class="sub">Підтвердити можна з понеділка</div>`;
@@ -323,7 +327,7 @@ function parentHTML(j) {
   if (preview) return `<div class="banner"><span>👀 Так бачить ${esc(d.name)}</span><button data-act="preview" data-v="0">Назад</button></div>` + kidHTML({...d, pc:null}, 'view');
   const today = d.today, wk = w.id, prevW = addD(wk,-7), nextW = addD(wk,7);
   const strip = `<div class="days"><button class="arrow" data-act="pday" data-v="${addD(prevW,6)}" aria-label="Попередній тиждень">‹</button>${d.days.map(x=>`<button class="${x.done===x.total&&!x.future?'full':''}" data-act="pday" data-v="${x.date}" aria-pressed="${x.date===d.date}" ${x.future?'disabled':''}>${x.dn}<span>${x.num}</span><small>${x.future?'':x.done+'/'+x.total}</small></button>`).join('')}<button class="arrow" data-act="pday" data-v="${nextW<=today?nextW:today}" ${wk>=addD(today,-((new Date(today+'T12:00:00Z').getUTCDay()+6)%7))?'disabled':''} aria-label="Наступний тиждень">›</button></div>`;
-  const news = d.news.length ? `<section class="card"><h2>✨ Нове</h2>${d.news.map(n=>`<div class="nrow"><span class="tx"><span class="k">${n.type==='learn'?'дізнався':n.type==='try'?'спробував':'дочитав книжку'}</span>${esc(n.text)}</span><span class="pick" style="margin:0">${w.approved?(n.ok===true?'✅':n.ok===false?'❌':'—'):`<button data-act="pnews" data-id="${n.id}" data-v="1" aria-pressed="${n.ok===true}">✅</button><button data-act="pnews" data-id="${n.id}" data-v="0" aria-pressed="${n.ok===false}">❌</button>`}</span></div>`).join('')}</section>` : '';
+  const news = d.news.length ? `<section class="card"><h2>✨ Нове</h2>${d.news.map(n=>`<div class="nrow"><span class="tx"><span class="k">${n.type==='learn'?'дізнався':n.type==='try'?'спробував':'дочитав книжку'}</span>${esc(n.text)}</span><span class="pick" style="margin:0;flex-wrap:wrap">${w.approved?(n.ok===true?'✅ '+uah(n.amount||0):n.ok===false?'❌':'—'):n.ok===true?`<span class="sub">✅ ${uah(n.amount||0)}</span><button data-act="pnews" data-id="${n.id}" data-v="0">✕</button>`:`${[10,25,50,75,100].map(a=>`<button data-act="pnews" data-id="${n.id}" data-v="1" data-amt="${a}" aria-pressed="${n.ok===true&&n.amount===a}">${a}</button>`).join('')}<button data-act="pnews" data-id="${n.id}" data-v="0" aria-pressed="${n.ok===false}">❌</button>`}</span></div>`).join('')}</section>` : '';
   const p = w.parts, lines = [['База',p.base],['Звички',p.habits],['Без пропусків',p.perfect],['Серія',p.streak],['Нове',p.news],['Книжки',p.books],['Похвала',p.praise],['Задачі',p.chores||0]];
   const approve = w.approved ? `<div class="note">✅ Підтверджено: ${uah(w.paid)}</div>` : w.complete ? `<button class="cta" data-act="papprove">Підтвердити тиждень · ${uah(w.total)}</button>` : `<div class="sub">Підтвердити можна з понеділка</div>`;
   return `<div class="row" style="padding:0 4px"><h1>Керування</h1><span class="lbl">${esc(j.name)}</span></div>` + sw +
@@ -368,7 +372,7 @@ document.addEventListener('click', e => {
   if (a==='pday') { date = v; reviewWeek = ''; fixOpen.clear(); call('app_state'); }
   if (a==='fixopen') { fixOpen.add(b.dataset.h); render(state); }
   if (a==='pset') { fixOpen.delete(b.dataset.h); call('app_p_toggle', {habit:b.dataset.h, ok: v==='1'}); }
-  if (a==='pnews') call('app_p_news', {id:b.dataset.id, ok: v==='1'});
+  if (a==='pnews') call('app_p_news', {id:b.dataset.id, ok: v==='1', amount: Number(b.dataset.amt||0)});
   if (a==='pamt') { pamt = Number(v); document.querySelectorAll('[data-act=pamt]').forEach(x=>x.setAttribute('aria-pressed', x===b)); }
   if (a==='psave') { const my = (state.detail.praise||{})[state.pkey]||{}, why = document.getElementById('why').value; drafts[state.detail.kid] = why; call('app_p_praise', {amt: pamt ?? (my.amt||0), why}); }
   if (a==='papprove') { if (b.dataset.confirm) call('app_p_approve'); else { b.dataset.confirm = '1'; b.textContent = 'Натисніть ще раз, щоб підтвердити'; } }
@@ -385,8 +389,8 @@ document.addEventListener('click', e => {
   if (a==='review') { reviewMode = v==='1'; if (!reviewMode) { reviewWeek = ''; } render(state); window.scrollTo(0,0); if (b.dataset.scroll) { const el = document.getElementById('blk-'+b.dataset.scroll); if (el) el.scrollIntoView({block:'start'}); } }
   if (a==='rweek') { reviewWeek = v; date = null; call('app_state'); }
   if (a==='rcell') { if (!reviewWeek) reviewWeek = state.detail.week.id; call('app_p_toggle', {habit: b.dataset.h, ok: v==='1', date: b.dataset.d}); }
-  if (a==='ntype') { newsType = v; document.querySelectorAll('[data-act=ntype]').forEach(x=>x.setAttribute('aria-pressed', x===b)); }
-  if (a==='news') { const t = document.getElementById('newstext').value; if (t.trim().length > 1) call('app_news', {type: newsType, text: t}); }
+  if (a==='ntype') { newsType = newsType === v ? '' : v; render(state); if (newsType) { const el = document.getElementById('newstext'); if (el) el.focus(); } }
+  if (a==='news') { const t = document.getElementById('newstext').value, ty = newsType; if (ty && t.trim().length > 1) { newsType = ''; call('app_news', {type: ty, text: t}); } }
 });
 // вибір задачі зі списку підставляє її ціну; поле назви — лише для свого завдання
 document.addEventListener('change', e => {
