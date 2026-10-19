@@ -105,7 +105,7 @@ let toast = ''; // коротке повідомлення над екраном
 let diag = null;  // що сталося з попереднім обірваним запитом — сервер запише в лог
 const drafts = {}; // чернетки похвали за дитиною: не губляться, якщо збереження не пройшло
 // дії, які безпечно повторити (результат той самий, скільки разів не надішли)
-const BUILD = '17'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
+const BUILD = '18'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
 const SAFE = new Set(['app_state','app_p_praise','app_p_toggle','app_toggle','app_screen','app_p_news','app_p_chore_price','app_p_task_ok','app_p_habit_day','app_p_task_credit']);
 let lastAction = '';
 async function call(action, extra={}) {
@@ -309,11 +309,12 @@ function reviewHTML(j) {
   const approve = w.approved ? `<div class="note">✅ Підтверджено: ${uah(w.paid)}</div>` : w.complete ? `<button class="cta" data-act="papprove">Підтвердити тиждень · ${uah(w.total)}</button>` : `<div class="sub">Підтвердити можна з понеділка</div>`;
   const sw = `<div class="kidsw">${j.kids.map(k=>`<button data-act="pkid" data-v="${k.kid}" aria-pressed="${k.kid===pkid}"><b>${esc(k.name)}</b></button>`).join('')}</div>`;
   const prevW = addD(w.id,-7), nextW = addD(w.id,7);
-  return `<div class="row" style="padding:0 4px"><h1>Звірка</h1><button class="fix" data-act="review" data-v="0">← Керування</button></div>${sw}
+  return `<div class="row" style="padding:0 4px"><h1>Звірка</h1><button class="ghost" style="width:auto;padding:8px 12px" data-act="review" data-v="0">← Керування</button></div>${sw}
     <section class="card"><div class="row"><button class="fix" data-act="rweek" data-v="${prevW}">‹</button><h2>${shortD(w.id)} – ${shortD(addD(w.id,6))}</h2><button class="fix" data-act="rweek" data-v="${nextW}" ${nextW>d.today?'disabled':''}>›</button></div>${hd}${rows}${legend}</section>
     <section class="card">${chores}${news}${praise?`<div class="lbl">👍 Похвала</div>${praise}`:''}${w.approved?'':`<button class="ghost" data-act="review" data-v="0" data-scroll="praise">Написати похвалу</button>`}</section>
     <section class="card"><div class="row"><h2>Разом</h2><span class="big" style="font-size:22px">${uah(w.approved?w.paid:w.total)}</span></div><div class="lines">${lines.map(([t,v])=>`<div class="l"><span>${t}</span><span class="v">${uah(v)}</span></div>`).join('')}</div>
-    ${d.letter?`<details><summary>📝 Лист, який отримає ${esc(d.name)}</summary><div class="sub" style="white-space:pre-line;margin-top:6px">${esc(d.letter)}</div></details>`:''}${approve}</section>`;
+    ${d.letter?`<details><summary>📝 Лист, який отримає ${esc(d.name)}</summary><div class="sub" style="white-space:pre-line;margin-top:6px">${esc(d.letter)}</div></details>`:''}${approve}</section>
+    <button class="ghost" data-act="review" data-v="0">← Назад до керування</button>`;
 }
 function parentHTML(j) {
   if (reviewMode) return reviewHTML(j);
@@ -334,7 +335,14 @@ function parentHTML(j) {
     <button class="ghost" data-act="preview" data-v="1">👀 Як бачить ${esc(d.name)}</button>`;
 }
 let pamt = null, histOpen = false;
+function syncBack() {
+  if (!tg || !tg.BackButton) return;
+  const show = reviewMode || histOpen || preview;
+  if (show) tg.BackButton.show(); else tg.BackButton.hide();
+}
+if (tg && tg.BackButton) tg.BackButton.onClick(() => { if (histOpen) histOpen = false; else if (preview) preview = false; else if (reviewMode) { reviewMode = false; reviewWeek = ''; } render(state); window.scrollTo(0,0); });
 function render(j) {
+  syncBack();
   const app = document.getElementById('app');
   if (j.error) { app.innerHTML = `<div class="err">${esc(j.error)}</div>`; return; }
   const t = toast ? `<div class="err">${esc(toast)}</div>` : ''; toast = '';
