@@ -105,7 +105,7 @@ let toast = ''; // коротке повідомлення над екраном
 let diag = null;  // що сталося з попереднім обірваним запитом — сервер запише в лог
 const drafts = {}; // чернетки похвали за дитиною: не губляться, якщо збереження не пройшло
 // дії, які безпечно повторити (результат той самий, скільки разів не надішли)
-const BUILD = '15'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
+const BUILD = '16'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
 const SAFE = new Set(['app_state','app_p_praise','app_p_toggle','app_toggle','app_screen','app_p_news','app_p_chore_price','app_p_task_ok','app_p_habit_day','app_p_task_credit']);
 let lastAction = '';
 async function call(action, extra={}) {
@@ -202,7 +202,7 @@ function flexHTML(k) {
   return `<details id="blk-schedule"><summary>📅 Розклад цього дня</summary><div class="pick" style="margin:6px 0 0;flex-wrap:wrap">${k.flex.map(f=>`<button data-act="pflex" data-h="${f.k}" data-v="${f.on?0:1}">${f.on?'− '+esc(f.t):'+ '+esc(f.t)}</button>`).join('')}</div></details>`;
 }
 // 🧹 Задачі — дитина
-let tmode = 'first', taskNote = '', creditShare = 1;
+let tmode = 'first', taskNote = '';
 const TBTN = {done:'✅ Виконав', no:'❌ Не виконав'};
 function tasksCard(k, view) {
   const dis = view ? ' disabled' : '';
@@ -265,49 +265,33 @@ function kidHTML(k, mode) {
   const seg = mode==='kid' ? `<div class="seg"><button data-act="day" data-v="${k.today}" aria-pressed="${date===k.today}">Сьогодні</button><button data-act="day" data-v="${yday}" aria-pressed="${date===yday}">Вчора</button></div>` : '';
   return `<div class="lbl" style="padding:0 4px">Твій день · ${esc(k.name)}</div>` + goalCard(k) + seg + habitsCard(k, mode) + tasksCard(k, mode==='view') + newsCardKid(mode==='view') + praiseCardKid(k, mode==='view') + weekCard(k);
 }
-// 🧹 Задачі — батьки: рішення словами, частка винагороди одним перемикачем
+// 🧹 Задачі — батьки: «чекають рішення» (хто натиснув) і «відкриті» (ніхто не натискав); частка — біля конкретної задачі
 const SHARE_L = {1:'100%', 0.75:'¾', 0.5:'½', 0.25:'¼'};
+let creditOpen = ''; // "taskId:kid" — розкриті частки для прямого зарахування
 function ptasksHTML(T, kidName) {
   if (!T) return '';
-  const shares = `<div class="row" style="font-size:13px"><span class="muted">Зараховувати:</span><span class="chips">${[1,0.75,0.5,0.25].map(v=>`<button data-act="share" data-v="${v}" aria-pressed="${creditShare===v}">${SHARE_L[v]}</button>`).join('')}</span></div><div class="sub">менше 100% — якщо частину доробили батьки</div>`;
-  const amt = p => Math.round(p.price * creditShare);
-  const pend = T.pending.length ? T.pending.map(p=>`<div class="nrow" style="flex-wrap:wrap"><span class="tx"><span class="k">${esc(p.name)} натиснув «Виконав» · ${shortD(p.day)}</span>${esc(p.title)} · ${uah(p.price)}</span><span class="pick" style="margin:0;flex-wrap:wrap">${p.group&&p.group.length>1
-    ? `<button data-act="ptask" data-how="both" data-id="${p.claim}">✅ Обом навпіл</button>${p.group.map(g=>`<button data-act="ptask" data-how="only" data-id="${g.claim}">Лише ${esc(g.name)}</button>`).join('')}<button data-act="ptask" data-how="none" data-id="${p.claim}">❌ Нікому</button>`
-    : `<button data-act="ptask" data-id="${p.claim}" data-v="1">✅ ${amt(p)} ₴</button><button data-act="ptask" data-id="${p.claim}" data-v="0">❌</button>`}</span></div>`).join('') : '';
-  const act = T.active.map(t=>`<div class="nrow" style="flex-wrap:wrap"><span class="tx"><span class="k">${t.daily?'щодня':'дали '+esc(t.since||'')} · ${esc(t.state)}</span>${esc(t.title)} · ${uah(t.price)}</span><span class="pick" style="margin:0;flex-wrap:wrap">${(t.credit||[]).map(c=>`<button data-act="pcredit" data-id="${t.id}" data-kid="${c.kid}">✅ ${esc(c.name)}</button>`).join('')}${t.daily?'':`<button data-act="pcancel" data-id="${t.id}">Скасувати</button>`}</span></div>`).join('');
+  const dec = p => `<span class="pick" style="margin:0;flex-wrap:wrap">${[1,0.5].map(sh=>`<button data-act="ptask" data-id="${p.claim}" data-v="1" data-share="${sh}">✅ ${Math.round(p.price*sh)} ₴${sh<1?' (½)':''}</button>`).join('')}<button data-act="ptask" data-id="${p.claim}" data-v="0">❌ Ні</button></span>`;
+  const pend = T.pending.map(p=>`<div class="nrow" style="flex-wrap:wrap"><span class="tx"><span class="k">${esc(p.name)} натиснув «Виконав» · ${shortD(p.day)}</span>${esc(p.title)} · ${uah(p.price)}</span>${p.group&&p.group.length>1
+    ? `<span class="pick" style="margin:0;flex-wrap:wrap"><button data-act="ptask" data-how="both" data-id="${p.claim}">✅ Обом навпіл</button>${p.group.map(g=>`<button data-act="ptask" data-how="only" data-id="${g.claim}">Лише ${esc(g.name)}</button>`).join('')}<button data-act="ptask" data-how="none" data-id="${p.claim}">❌ Нікому</button></span>`
+    : dec(p)}</div>`).join('');
+  const act = T.active.map(t=>`<div class="nrow" style="flex-wrap:wrap"><span class="tx"><span class="k">${t.daily?'щодня':'дали о '+esc(t.since||'')} · ${esc(t.state)}</span>${esc(t.title)} · ${uah(t.price)}</span><span class="pick" style="margin:0;flex-wrap:wrap">${(t.credit||[]).map(c=>creditOpen===t.id+':'+c.kid
+    ? `<span class="chips">${[1,0.75,0.5,0.25].map(sh=>`<button data-act="pcredit" data-id="${t.id}" data-kid="${c.kid}" data-share="${sh}">${esc(c.name)} ${SHARE_L[sh]}</button>`).join('')}</span>`
+    : `<button data-act="copen" data-v="${t.id}:${c.kid}">Зарахувати ${esc(c.name)}</button>`).join('')}${t.daily?'':`<button data-act="pcancel" data-id="${t.id}">Скасувати</button>`}</span></div>`).join('');
   const opts = T.catalog.filter(c=>!c.daily).map(c=>`<option value="${c.id}" data-price="${c.price}" data-mode="${c.mode}">${esc(c.title)} · ${c.price} ₴</option>`).join('');
   const prices = T.catalog.map(c=>`<div class="nrow"><span class="tx">${esc(c.title)}${c.daily?`<span class="k">щодня</span>`:''}</span><span class="pick" style="margin:0;align-items:center"><input class="why" type="number" inputmode="numeric" data-cprice="${c.id}" value="${c.price}" style="width:76px;padding:8px"><button data-act="pprice" data-id="${c.id}">💾</button></span></div>`).join('');
   return `<section class="card" id="blk-tasks"><div class="row"><h2>🧹 Задачі</h2><span class="sub">без бонусів</span></div>
-    ${pend || act ? shares : ''}
     ${pend ? `<div class="lbl">Чекають вашого рішення</div>${pend}` : ''}
-    ${act ? `<div class="lbl">Відкриті · зробив, але не натиснув — зарахуйте</div>${act}` : ''}
-    <details ${pend||act?'':'open'}><summary>➕ Дати завдання</summary>
+    ${act ? `<div class="lbl">Сьогодні · ніхто ще не натискав</div><div class="sub">Зробив, але не натиснув? «Зарахувати» — і вибрати частку, якщо доробили ви.</div>${act}` : ''}
+    ${!pend && !act ? '<div class="sub">Сьогодні задач немає</div>' : ''}
+    <details ${pend||act?'':'open'}><summary>➕ Дати завдання на сьогодні</summary>
     <div class="seg" style="background:var(--bg);margin-top:8px"><button data-act="tmode" data-v="first" aria-pressed="${tmode==='first'}">🏃 Хто перший</button><button data-act="tmode" data-v="pair" aria-pressed="${tmode==='pair'}">👥 Удвох, навпіл</button></div>
     <select id="tsel" class="why" style="margin-top:8px"><option value="">✏️ Своє завдання…</option>${opts}</select>
     <input class="why" id="ttitle" placeholder="Назва свого завдання" style="margin-top:8px">
     <div class="row" style="flex-wrap:nowrap;margin-top:8px"><input class="why" id="tprice" type="number" inputmode="numeric" value="${T.def}" style="width:100px"><label class="muted" style="font-size:13px;display:flex;gap:6px;align-items:center"><input type="checkbox" id="tsave"> запам'ятати в списку</label></div>
     <button class="cta" data-act="ppost" style="margin-top:8px">Опублікувати</button>
+    <div class="sub" style="margin-top:6px">Діти побачать його сьогодні; якщо ніхто не натисне — завтра зникне саме.</div>
     ${taskNote ? `<div class="note" style="margin-top:8px">${esc(taskNote)}</div>` : ''}
     <details style="margin-top:8px"><summary>Ціни за замовчуванням</summary>${prices}</details></details></section>`;
-}
-// 📊 Звірка тижня: таблиця звички × дні (клітинку можна виправити), задачі, похвала, нове, лист, «Підтвердити»
-function reviewHTML(j) {
-  const d = j.detail, w = d.week, p = w.parts;
-  const hd = `<div class="grid"><span></span>${d.gridDays.map(x=>`<span class="hd">${x.dn}<br>${x.num}</span>`).join('')}</div>`;
-  const rows = d.grid.map(h=>`<div class="grid"><span class="nm">${esc(h.t)}</span>${h.cells.map(c=>!c?'<span class="c"></span>':c.can?`<button data-act="rcell" data-h="${h.k}" data-d="${c.d}" data-v="${c.v===true?0:1}" class="${c.v===true?'ok':c.v===false?'no':c.opt?'opt':'none'}">${c.v===true?'✓':c.v===false?'✕':c.opt?'·':'?'}</button>`:`<span class="c ${c.v===true?'ok':c.v===false?'no':''}" style="opacity:1">${c.v===true?'✓':c.v===false?'✕':''}</span>`).join('')}</div>`).join('');
-  const legend = `<div class="sub">? — без відмітки (жовте), натисніть, щоб поставити ✓ або ✕ · «·» — вихідний за бажанням</div>`;
-  const chores = (w.chores||[]).length ? `<div class="lbl">🧹 Задачі · ${uah(p.chores)}</div>${w.chores.map(x=>`<div class="nrow"><span class="tx">${shortD(x.day)} · ${esc(x.title)}${x.share<1?' · '+Math.round(x.share*100)+'%':''}</span><span class="v num">+${uah(x.amount)}</span></div>`).join('')}` : '';
-  const news = d.news.length ? `<div class="lbl">✨ Нове</div>${d.news.map(n=>`<div class="nrow"><span class="tx"><span class="k">${n.type==='learn'?'дізнався':n.type==='try'?'спробував':'книжка'}</span>${esc(n.text)}</span><span class="pick" style="margin:0">${w.approved?(n.ok===true?'✅':n.ok===false?'❌':'—'):`<button data-act="pnews" data-id="${n.id}" data-v="1" aria-pressed="${n.ok===true}">✅</button><button data-act="pnews" data-id="${n.id}" data-v="0" aria-pressed="${n.ok===false}">❌</button>`}</span></div>`).join('')}` : '';
-  const praise = praiseBlock(d.praise, d.notes);
-  const lines = [['База',p.base],['Звички',p.habits],['Без пропусків',p.perfect],['Серія',p.streak],['Нове',p.news],['Книжки',p.books],['Похвала',p.praise],['Задачі',p.chores||0]];
-  const approve = w.approved ? `<div class="note">✅ Підтверджено: ${uah(w.paid)}</div>` : w.complete ? `<button class="cta" data-act="papprove">Підтвердити тиждень · ${uah(w.total)}</button>` : `<div class="sub">Підтвердити можна з понеділка</div>`;
-  const sw = `<div class="kidsw">${j.kids.map(k=>`<button data-act="pkid" data-v="${k.kid}" aria-pressed="${k.kid===pkid}"><b>${esc(k.name)}</b></button>`).join('')}</div>`;
-  const prevW = addD(w.id,-7), nextW = addD(w.id,7);
-  return `<div class="row" style="padding:0 4px"><h1>Звірка</h1><button class="fix" data-act="review" data-v="0">← Керування</button></div>${sw}
-    <section class="card"><div class="row"><button class="fix" data-act="rweek" data-v="${prevW}">‹</button><h2>${shortD(w.id)} – ${shortD(addD(w.id,6))}</h2><button class="fix" data-act="rweek" data-v="${nextW}" ${nextW>d.today?'disabled':''}>›</button></div>${hd}${rows}${legend}</section>
-    <section class="card">${chores}${news}${praise?`<div class="lbl">👍 Похвала</div>${praise}`:''}${w.approved?'':`<button class="ghost" data-act="review" data-v="0" data-scroll="praise">Написати похвалу</button>`}</section>
-    <section class="card"><div class="row"><h2>Разом</h2><span class="big" style="font-size:22px">${uah(w.approved?w.paid:w.total)}</span></div><div class="lines">${lines.map(([t,v])=>`<div class="l"><span>${t}</span><span class="v">${uah(v)}</span></div>`).join('')}</div>
-    ${d.letter?`<details><summary>📝 Лист, який отримає ${esc(d.name)}</summary><div class="sub" style="white-space:pre-line;margin-top:6px">${esc(d.letter)}</div></details>`:''}${approve}</section>`;
 }
 function parentHTML(j) {
   if (reviewMode) return reviewHTML(j);
@@ -356,11 +340,11 @@ document.addEventListener('click', e => {
   if (a==='psave') { const my = (state.detail.praise||{})[state.pkey]||{}, why = document.getElementById('why').value; drafts[state.detail.kid] = why; call('app_p_praise', {amt: pamt ?? (my.amt||0), why}); }
   if (a==='papprove') { if (b.dataset.confirm) call('app_p_approve'); else { b.dataset.confirm = '1'; b.textContent = 'Натисніть ще раз, щоб підтвердити'; } }
   if (a==='task') call('app_task_'+b.dataset.a, {id: b.dataset.id});
-  if (a==='share') { creditShare = Number(v); render(state); }
-  if (a==='ptask') call('app_p_task_ok', {claim: b.dataset.id, ok: v==='1', how: b.dataset.how, share: creditShare});
+  if (a==='copen') { creditOpen = creditOpen === v ? '' : v; render(state); }
+  if (a==='ptask') call('app_p_task_ok', {claim: b.dataset.id, ok: v==='1', how: b.dataset.how, share: Number(b.dataset.share||1)});
   if (a==='pflex') call('app_p_habit_day', {habit: b.dataset.h, on: v==='1'});
   if (a==='tmode') { tmode = v; document.querySelectorAll('[data-act=tmode]').forEach(x=>x.setAttribute('aria-pressed', x===b)); }
-  if (a==='pcredit') call('app_p_task_credit', {id: b.dataset.id, kid: b.dataset.kid, share: creditShare});
+  if (a==='pcredit') { creditOpen = ''; call('app_p_task_credit', {id: b.dataset.id, kid: b.dataset.kid, share: Number(b.dataset.share||1)}); }
   if (a==='pcancel') { if (b.dataset.confirm) call('app_p_task_cancel', {id: b.dataset.id}); else { b.dataset.confirm = '1'; b.textContent = 'Точно?'; } }
   if (a==='pprice') call('app_p_chore_price', {id: b.dataset.id, price: Number(document.querySelector(`[data-cprice="${b.dataset.id}"]`).value)});
   if (a==='ppost') { const sel = document.getElementById('tsel'); call('app_p_task_post', {chore: sel.value || null, title: document.getElementById('ttitle').value, price: Number(document.getElementById('tprice').value), save: document.getElementById('tsave').checked, mode: tmode}); }
