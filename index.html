@@ -105,14 +105,15 @@ let toast = ''; // коротке повідомлення над екраном
 let diag = null;  // що сталося з попереднім обірваним запитом — сервер запише в лог
 const drafts = {}; // чернетки похвали за дитиною: не губляться, якщо збереження не пройшло
 // дії, які безпечно повторити (результат той самий, скільки разів не надішли)
-const BUILD = '16'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
+const BUILD = '17'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
 const SAFE = new Set(['app_state','app_p_praise','app_p_toggle','app_toggle','app_screen','app_p_news','app_p_chore_price','app_p_task_ok','app_p_habit_day','app_p_task_credit']);
 let lastAction = '';
 async function call(action, extra={}) {
   lastAction = action;
   if (!tg || !tg.initData) { render({error:'Відкрийте цю сторінку з бота @Pidsumky_bot.'}); return; }
-  busy = true;
-  const send = () => { const body = JSON.stringify({action, date, kid:pkid, ...(reviewWeek && !date ? {week: reviewWeek} : {}), ...extra, ...(diag ? {diag} : {})}); return fetch(API, {method:'POST', headers:{'content-type':'application/json','x-tg-init-data':tg.initData}, body}); };
+  busy = true; document.body.style.cursor = 'progress';
+  // таймаут 20 с: завислий запит на телефоні не має блокувати сторінку назавжди
+  const send = () => { const body = JSON.stringify({action, date, kid:pkid, ...(reviewWeek && !date ? {week: reviewWeek} : {}), ...extra, ...(diag ? {diag} : {})}); const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 20000); return fetch(API, {method:'POST', headers:{'content-type':'application/json','x-tg-init-data':tg.initData}, body, signal: ac.signal}).finally(() => clearTimeout(t)); };
   let r = null, j = null;
   for (let attempt = 0; attempt < 3 && !r; attempt++) {
     try { r = await send(); j = await r.json(); diag = null; }
@@ -124,7 +125,7 @@ async function call(action, extra={}) {
       await new Promise(res => setTimeout(res, 1200 * (attempt + 1)));
     }
   }
-  busy = false;
+  busy = false; document.body.style.cursor = '';
   if (!r) {
     // екран не стираємо: показуємо останній стан і підказку
     if (state) { toast = 'Немає звʼязку із сервером. Спробуйте ще раз — набране не загубилось.'; render(state); }
@@ -239,6 +240,8 @@ function praiseCardParent(j) {
   const d = j.detail, w = d.week, my = (d.praise||{})[j.pkey] || {}, pr = (w.rates||{}).praise ?? 50;
   const other = Object.keys(PNAME).find(k => k !== j.pkey), oth = (d.praise||{})[other];
   const hist = (d.history||[]).length ? `<button class="ghost" data-act="hist">Історія · ${d.history.length} тижн.</button>` : '';
+  // підтверджений тиждень — лише читання: обидві похвали й листи дитини як текст
+  if (w.approved) return `<section class="card" id="blk-praise"><div class="row"><h2>👍 Похвала</h2><span class="sub">🔒 тиждень підтверджено</span></div>${praiseBlock(d.praise, d.notes) || '<div class="sub">Похвали за цей тиждень не було</div>'}<div class="sub">Нову похвалу можна написати за поточний тиждень — виберіть сьогоднішній день.</div>${hist}</section>`;
   return `<section class="card" id="blk-praise"><div class="row"><h2>👍 Похвала</h2><span class="sub">до ${pr} ₴ від кожного</span></div>
     ${oth && oth.why ? `<div class="pr"><b>${PNAME[other]} · +${oth.amt} ₴</b>${esc(oth.why)}</div>` : ''}
     ${praiseBlock(null, d.notes)}
@@ -293,6 +296,25 @@ function ptasksHTML(T, kidName) {
     ${taskNote ? `<div class="note" style="margin-top:8px">${esc(taskNote)}</div>` : ''}
     <details style="margin-top:8px"><summary>Ціни за замовчуванням</summary>${prices}</details></details></section>`;
 }
+// 📊 Звірка тижня: таблиця звички × дні (клітинку можна виправити), задачі, похвала, нове, лист, «Підтвердити»
+function reviewHTML(j) {
+  const d = j.detail, w = d.week, p = w.parts;
+  const hd = `<div class="grid"><span></span>${d.gridDays.map(x=>`<span class="hd">${x.dn}<br>${x.num}</span>`).join('')}</div>`;
+  const rows = d.grid.map(h=>`<div class="grid"><span class="nm">${esc(h.t)}</span>${h.cells.map(c=>!c?'<span class="c"></span>':c.can?`<button data-act="rcell" data-h="${h.k}" data-d="${c.d}" data-v="${c.v===true?0:1}" class="${c.v===true?'ok':c.v===false?'no':c.opt?'opt':'none'}">${c.v===true?'✓':c.v===false?'✕':c.opt?'·':'?'}</button>`:`<span class="c ${c.v===true?'ok':c.v===false?'no':''}" style="opacity:1">${c.v===true?'✓':c.v===false?'✕':''}</span>`).join('')}</div>`).join('');
+  const legend = `<div class="sub">? — без відмітки (жовте), натисніть, щоб поставити ✓ або ✕ · «·» — вихідний за бажанням</div>`;
+  const chores = (w.chores||[]).length ? `<div class="lbl">🧹 Задачі · ${uah(p.chores)}</div>${w.chores.map(x=>`<div class="nrow"><span class="tx">${shortD(x.day)} · ${esc(x.title)}${x.share<1?' · '+Math.round(x.share*100)+'%':''}</span><span class="v num">+${uah(x.amount)}</span></div>`).join('')}` : '';
+  const news = d.news.length ? `<div class="lbl">✨ Нове</div>${d.news.map(n=>`<div class="nrow"><span class="tx"><span class="k">${n.type==='learn'?'дізнався':n.type==='try'?'спробував':'книжка'}</span>${esc(n.text)}</span><span class="pick" style="margin:0">${w.approved?(n.ok===true?'✅':n.ok===false?'❌':'—'):`<button data-act="pnews" data-id="${n.id}" data-v="1" aria-pressed="${n.ok===true}">✅</button><button data-act="pnews" data-id="${n.id}" data-v="0" aria-pressed="${n.ok===false}">❌</button>`}</span></div>`).join('')}` : '';
+  const praise = praiseBlock(d.praise, d.notes);
+  const lines = [['База',p.base],['Звички',p.habits],['Без пропусків',p.perfect],['Серія',p.streak],['Нове',p.news],['Книжки',p.books],['Похвала',p.praise],['Задачі',p.chores||0]];
+  const approve = w.approved ? `<div class="note">✅ Підтверджено: ${uah(w.paid)}</div>` : w.complete ? `<button class="cta" data-act="papprove">Підтвердити тиждень · ${uah(w.total)}</button>` : `<div class="sub">Підтвердити можна з понеділка</div>`;
+  const sw = `<div class="kidsw">${j.kids.map(k=>`<button data-act="pkid" data-v="${k.kid}" aria-pressed="${k.kid===pkid}"><b>${esc(k.name)}</b></button>`).join('')}</div>`;
+  const prevW = addD(w.id,-7), nextW = addD(w.id,7);
+  return `<div class="row" style="padding:0 4px"><h1>Звірка</h1><button class="fix" data-act="review" data-v="0">← Керування</button></div>${sw}
+    <section class="card"><div class="row"><button class="fix" data-act="rweek" data-v="${prevW}">‹</button><h2>${shortD(w.id)} – ${shortD(addD(w.id,6))}</h2><button class="fix" data-act="rweek" data-v="${nextW}" ${nextW>d.today?'disabled':''}>›</button></div>${hd}${rows}${legend}</section>
+    <section class="card">${chores}${news}${praise?`<div class="lbl">👍 Похвала</div>${praise}`:''}${w.approved?'':`<button class="ghost" data-act="review" data-v="0" data-scroll="praise">Написати похвалу</button>`}</section>
+    <section class="card"><div class="row"><h2>Разом</h2><span class="big" style="font-size:22px">${uah(w.approved?w.paid:w.total)}</span></div><div class="lines">${lines.map(([t,v])=>`<div class="l"><span>${t}</span><span class="v">${uah(v)}</span></div>`).join('')}</div>
+    ${d.letter?`<details><summary>📝 Лист, який отримає ${esc(d.name)}</summary><div class="sub" style="white-space:pre-line;margin-top:6px">${esc(d.letter)}</div></details>`:''}${approve}</section>`;
+}
 function parentHTML(j) {
   if (reviewMode) return reviewHTML(j);
   const d = j.detail, w = d.week;
@@ -320,8 +342,11 @@ function render(j) {
   app.innerHTML = t + (j.role === 'parent' ? parentHTML(j) : (j.note ? `<div class="note">${esc(j.note)}</div>` : '') + kidHTML(j, 'kid')) + h;
 }
 document.addEventListener('click', e => {
-  const b = e.target.closest('[data-act]'); if (!b || busy || b.disabled) return;
+  const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
   const a = b.dataset.act, v = b.dataset.v;
+  // кнопки без запиту на сервер працюють завжди, навіть поки чекаємо відповіді
+  const uiOnly = ['hist','histclose','fixopen','pamt','tmode','copen','preview','review','ntype'];
+  if (busy && !uiOnly.includes(a)) return;
   if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
   if (a==='day') { date = v; call('app_state'); }
   if (a==='set') call('app_toggle', {habit:b.dataset.h, ok: v==='1'});
