@@ -105,7 +105,7 @@ let toast = ''; // коротке повідомлення над екраном
 let diag = null;  // що сталося з попереднім обірваним запитом — сервер запише в лог
 const drafts = {}; // чернетки похвали за дитиною: не губляться, якщо збереження не пройшло
 // дії, які безпечно повторити (результат той самий, скільки разів не надішли)
-const BUILD = '20'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
+const BUILD = '21'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
 const SAFE = new Set(['app_state','app_p_praise','app_p_toggle','app_toggle','app_screen','app_p_news','app_p_chore_price','app_p_task_ok','app_p_habit_day','app_p_task_credit']);
 let lastAction = '';
 async function call(action, extra={}) {
@@ -147,10 +147,10 @@ let scrolledOnce = false;
 
 function goalCard(k) {
   const p = k.piggy;
-  if (!p.goal) return `<section class="card"><div class="row"><div class="lbl">💰 Скарбничка</div><span class="big" style="font-size:22px">${uah(p.bal)}</span></div></section>`;
+  if (!p.goal) return `<section class="card" style="gap:6px"><div class="lbl">💰 Скарбничка</div><div class="big" style="font-size:34px">${uah(p.bal)}</div></section>`;
   const tot = p.total ?? p.bal, pct = Math.min(100, tot/p.goal*100), left = Math.max(0, p.goal - tot);
   const eta = left===0 ? 'Ціль досягнута! 🎉' : p.avg > 0 ? '≈ '+Math.ceil(left/p.avg)+' тиж.' : '';
-  return `<section class="card" style="gap:6px"><div class="row"><div><div class="lbl">🎯 ${esc(p.goal_name||'Ціль')}</div></div><div class="num" style="font-size:20px;font-weight:600">${uah(p.bal)}</div></div>
+  return `<section class="card" style="gap:6px"><div class="lbl">💰 Скарбничка · збираю на ${esc(p.goal_name||'ціль')}</div><div class="big" style="font-size:34px;line-height:1.1">${uah(p.bal)}</div>
   <div class="bar"><i style="width:${pct}%"></i></div>
   <div class="row muted" style="font-size:13px"><span>${p.promised?`твої ${uah(p.bal)} + батьки ${uah(p.promised)} = `:''}${uah(tot)} з ${uah(p.goal)}</span><span>${eta}</span></div></section>`;
 }
@@ -261,7 +261,7 @@ function historyModal(h) {
 function streakHTML(w) { return `<div class="streak">${w.streak.map((v,i)=>`<div class="${w.clean&&w.level===i?'on':''}"><b>+${v} ₴</b>${i===0?'1-й тиждень':i===1?'2-й поспіль':'3-й і далі'}</div>`).join('')}</div>`; }
 function weekCard(k) {
   const w = k.week, r = w.rates || {perfect:15, news:50, book:50, praise:50};
-  return `<section class="card"><div class="row"><h2>📊 Тиждень</h2><span class="muted">${uah(w.total)} <span style="font-size:12px">з ${uah(w.max)}</span></span></div>
+  return `<section class="card"><div class="row"><h2>📊 Тиждень</h2><span class="big" style="font-size:24px">${uah(w.total)} <span class="muted" style="font:600 12px var(--f-b)">з ${uah(w.max)}</span></span></div>
   ${streakHTML(w)}
   <div class="sub">${w.clean?`пропусків ${w.misses} з 2 — серія жива 🔥`:`пропусків ${w.misses} — серія цього тижня згоріла`}</div>
   <details><summary>Деталі</summary><div class="wk" style="margin-top:8px">${w.rows.map(r=>`<span>${esc(r.t)}</span><span class="v ${r.done===r.sch?'full':''}">${r.done}/${r.sch}${r.extra?` +${r.extra}`:''}</span>`).join('')}</div>
