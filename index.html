@@ -105,7 +105,7 @@ let toast = ''; // коротке повідомлення над екраном
 let diag = null;  // що сталося з попереднім обірваним запитом — сервер запише в лог
 const drafts = {}; // чернетки похвали за дитиною: не губляться, якщо збереження не пройшло
 // дії, які безпечно повторити (результат той самий, скільки разів не надішли)
-const BUILD = '22'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
+const BUILD = '23'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
 const SAFE = new Set(['app_state','app_p_praise','app_p_toggle','app_toggle','app_screen','app_p_news','app_p_chore_price','app_p_task_ok','app_p_habit_day','app_p_task_credit']);
 let lastAction = '';
 async function call(action, extra={}) {
@@ -164,16 +164,18 @@ function habitRowKid(it, k, view) {
   const dis = view ? ' disabled' : '', must = k.relaxed && it.must ? ' · обов\'язково і у вихідні' : '';
   const head = `<span class="t">${esc(it.t)}</span>${rw(it)}`;
   const sub = (txt) => `<br><span class="s">${esc(txt)}${must}</span>`;
-  if (it.type === 'self') return `<div class="item ${cls(it)}">${box(it)}<span>${head}${sub(it.hint || it.status)}${it.can || view ? two('set', it.k, it.done, dis) : ''}</span></div>`;
-  if (it.type === 'timed') return `<div class="item ${cls(it)}">${box(it)}<span>${head}${sub(it.status)}${it.can || view ? two('hw', it.k, it.done, dis) : ''}</span></div>`;
-  if (it.type === 'screen') return `<div class="item ${cls(it)}">${box(it)}<span>${head}${sub(it.status)}${it.can || view ? two('screen', it.k, it.done, dis, '✅ Вклався', '❌ Ні') : ''}</span></div>`;
+  if (it.type === 'self') return `<div class="item ${cls(it)}">${box(it)}<span>${head}${sub(it.hint || it.status)}${it.can || view ? two('set', it.k, it.done, dis) : fixReq(it, k, view)}</span></div>`;
+  if (it.type === 'timed') return `<div class="item ${cls(it)}">${box(it)}<span>${head}${sub(it.status)}${it.can || view ? two('hw', it.k, it.done, dis) : fixReq(it, k, view)}</span></div>`;
+  if (it.type === 'screen') return `<div class="item ${cls(it)}">${box(it)}<span>${head}${sub(it.status)}${it.can || view ? two('screen', it.k, it.done, dis, '✅ Вклався', '❌ Ні') : fixReq(it, k, view)}</span></div>`;
   if (it.type === 'auto') {
     if (it.can && it.late) return `<div class="item no">${box(it)}<span>${head}${sub(it.status)}<span class="pick"><button data-act="wake"${dis}>Зрозумів</button></span></span></div>`;
     if (it.can) return `<button class="item" data-act="wake"${dis}>${box(it)}<span>${head}${sub(it.status + ' · натисни, як прокинувся')}</span></button>`;
-    return `<div class="item ${cls(it)}">${box(it)}<span>${head}${sub(it.status)}</span></div>`;
+    return `<div class="item ${cls(it)}">${box(it)}<span>${head}${sub(it.status)}${fixReq(it, k, view)}</span></div>`;
   }
-  return `<div class="item ${cls(it)}">${box(it)}<span>${head}${sub(it.status + (it.hint ? ' · ' + it.hint : ''))}</span></div>`;
+  return `<div class="item ${cls(it)}">${box(it)}<span>${head}${sub(it.status + (it.hint ? ' · ' + it.hint : ''))}${fixReq(it, k, view)}</span></div>`;
 }
+// дитина сама контролює відмітки; де змінити вже не може — просить батьків виправити
+const fixReq = (it, k, view) => (!view && !it.can && it.done !== true && !k.approved) ? `<br><button class="fix" data-act="fixreq" data-h="${it.k}" data-d="${k.date}">Помилка? Попросити батьків виправити</button>` : '';
 const fixOpen = new Set(); // «Виправити» розкрито для цих звичок
 // ✅ Звички — батьки: дані дитини великим, «Виправити» — маленьке
 function habitRowParent(it, d) {
@@ -366,6 +368,7 @@ document.addEventListener('click', e => {
   if (a==='wake') call('app_wake');
   if (a==='hw') call('app_hw', {ok: v!=='0'});
   if (a==='screen') call('app_screen', {ok: v==='1'});
+  if (a==='fixreq') { if (b.dataset.confirm) call('app_fixreq', {habit: b.dataset.h, date: b.dataset.d}); else { b.dataset.confirm = '1'; b.textContent = 'Натисни ще раз — попросити батьків зарахувати'; } }
   if (a==='note') { const t = document.getElementById('note').value; if (t.trim().length > 1) call('app_note', {text: t}); }
   if (a==='hist') { histOpen = true; render(state); }
   if (a==='histclose') { histOpen = false; render(state); }
