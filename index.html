@@ -105,7 +105,7 @@ let toast = ''; // коротке повідомлення над екраном
 let diag = null;  // що сталося з попереднім обірваним запитом — сервер запише в лог
 const drafts = {}; // чернетки похвали за дитиною: не губляться, якщо збереження не пройшло
 // дії, які безпечно повторити (результат той самий, скільки разів не надішли)
-const BUILD = '21'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
+const BUILD = '22'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
 const SAFE = new Set(['app_state','app_p_praise','app_p_toggle','app_toggle','app_screen','app_p_news','app_p_chore_price','app_p_task_ok','app_p_habit_day','app_p_task_credit']);
 let lastAction = '';
 async function call(action, extra={}) {
@@ -139,6 +139,7 @@ async function call(action, extra={}) {
   if (appV && appV !== BUILD) { let done = false; try { done = sessionStorage.getItem('reloaded') === appV; sessionStorage.setItem('reloaded', appV); } catch(e) {} if (!done) { location.replace(location.pathname + '?v=' + appV); return; } }
   state = j; if (!date) date = j.role==='parent' ? j.detail.date : j.date;
   taskNote = j.role === 'parent' && /^app_p_(task|chore)/.test(lastAction) ? (j.note || '') : '';
+  praiseNote = j.role === 'parent' && lastAction === 'app_p_praise' ? (j.note || '') : '';
   if (j.role === 'parent') { const my = (j.detail.praise||{})[j.pkey]; if (my && drafts[j.detail.kid] === my.why) delete drafts[j.detail.kid]; }
   render(j);
   if (HASH && !scrolledOnce) { scrolledOnce = true; const el = document.getElementById('blk-' + HASH); if (el) { if (el.tagName === 'DETAILS') el.open = true; el.scrollIntoView({block:'start'}); } }
@@ -203,7 +204,7 @@ function flexHTML(k) {
   return `<details id="blk-schedule"><summary>📅 Розклад цього дня</summary><div class="pick" style="margin:6px 0 0;flex-wrap:wrap">${k.flex.map(f=>`<button data-act="pflex" data-h="${f.k}" data-v="${f.on?0:1}">${f.on?'− '+esc(f.t):'+ '+esc(f.t)}</button>`).join('')}</div></details>`;
 }
 // 🧹 Задачі — дитина
-let tmode = 'first', taskNote = '';
+let tmode = 'first', taskNote = '', praiseNote = '';
 const TBTN = {done:'✅ Виконав', no:'❌ Не виконав'};
 function tasksCard(k, view) {
   const dis = view ? ' disabled' : '';
@@ -251,7 +252,7 @@ function praiseCardParent(j) {
     ${praiseBlock(null, d.notes)}
     <div class="chips">${[0,Math.round(pr/2),pr].map(v=>`<button data-act="pamt" data-v="${v}" aria-pressed="${(pamt ?? my.amt ?? 0)===v}" ${w.approved?'disabled':''}>${v} ₴</button>`).join('')}</div>
     <textarea class="why" id="why" placeholder="За що саме? Конкретна дія — ${esc(d.name)} це прочитає" ${w.approved?'disabled':''}>${esc(drafts[d.kid] ?? my.why ?? '')}</textarea>
-    ${w.approved?'':'<button class="ghost" data-act="psave">Зберегти похвалу</button>'}${hist}</section>`;
+    ${w.approved?'':'<button class="ghost" data-act="psave">Зберегти похвалу</button>'}${praiseNote?`<div class="note">${praiseNote.startsWith('Похвалу збережено')?'✅ Збережено. '+esc(d.name)+' отримав повідомлення.':esc(praiseNote)}</div>`:''}${hist}</section>`;
 }
 function historyModal(h) {
   const weeks = h.map(x=>`<div><div class="lbl" style="margin-top:8px">${shortD(x.week)} – ${shortD(addD(x.week,6))}</div>${praiseBlock({mom:x.mom, dad:x.dad}, x.notes)}</div>`).join('');
@@ -331,7 +332,7 @@ function parentHTML(j) {
   const p = w.parts, lines = [['База',p.base],['Звички',p.habits],['Без пропусків',p.perfect],['Серія',p.streak],['Нове',p.news],['Книжки',p.books],['Похвала',p.praise],['Задачі',p.chores||0]];
   const approve = w.approved ? `<div class="note">✅ Підтверджено: ${uah(w.paid)}</div>` : w.complete ? `<button class="cta" data-act="papprove">Підтвердити тиждень · ${uah(w.total)}</button>` : `<div class="sub">Підтвердити можна з понеділка</div>`;
   return `<div class="row" style="padding:0 4px"><h1>Керування</h1><span class="lbl">${esc(j.name)}</span></div>` + sw +
-    (j.note && !taskNote ? `<div class="note">${esc(j.note)}</div>` : '') +
+    (j.note && !taskNote && !praiseNote ? `<div class="note">${esc(j.note)}</div>` : '') +
     `<section class="card" style="gap:6px"><div class="row"><h2>${shortD(d.date)}</h2>${d.approved?'<span class="lbl">🔒</span>':''}</div>${strip}</section>` +
     habitsCard(d, 'parent') + ptasksHTML(j.tasks, d.name) + praiseCardParent(j) + news +
     `<section class="card"><div class="row"><h2>📊 Тиждень</h2><span class="big" style="font-size:22px">${uah(w.approved?w.paid:w.total)}</span></div>${streakHTML(w)}
