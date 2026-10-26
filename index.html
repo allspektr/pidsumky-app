@@ -105,7 +105,7 @@ let toast = ''; // коротке повідомлення над екраном
 let diag = null;  // що сталося з попереднім обірваним запитом — сервер запише в лог
 const drafts = {}; // чернетки похвали за дитиною: не губляться, якщо збереження не пройшло
 // дії, які безпечно повторити (результат той самий, скільки разів не надішли)
-const BUILD = '23'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
+const BUILD = '24'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
 const SAFE = new Set(['app_state','app_p_praise','app_p_toggle','app_toggle','app_screen','app_p_news','app_p_chore_price','app_p_task_ok','app_p_habit_day','app_p_task_credit']);
 let lastAction = '';
 async function call(action, extra={}) {
@@ -258,7 +258,7 @@ function praiseCardParent(j) {
 }
 function historyModal(h) {
   const weeks = h.map(x=>`<div><div class="lbl" style="margin-top:8px">${shortD(x.week)} – ${shortD(addD(x.week,6))}</div>${praiseBlock({mom:x.mom, dad:x.dad}, x.notes)}</div>`).join('');
-  return `<div class="modal" data-act="histclose"><section class="card" onclick="event.stopPropagation()"><div class="row"><h2>👍 Історія похвали</h2><button class="fix" data-act="histclose">Закрити</button></div>${weeks || '<div class="sub">Поки порожньо</div>'}</section></div>`;
+  return `<div class="modal" data-act="histclose"><section class="card" data-act="noop"><div class="row"><h2>👍 Історія похвали</h2><button class="fix" data-act="histclose">Закрити</button></div>${weeks || '<div class="sub">Поки порожньо</div>'}</section></div>`;
 }
 // 📊 Тиждень — коротко, деталі згорнуті
 function streakHTML(w) { return `<div class="streak">${w.streak.map((v,i)=>`<div class="${w.clean&&w.level===i?'on':''}"><b>+${v} ₴</b>${i===0?'1-й тиждень':i===1?'2-й поспіль':'3-й і далі'}</div>`).join('')}</div>`; }
@@ -342,25 +342,31 @@ function parentHTML(j) {
     <button class="ghost" data-act="preview" data-v="1">👀 Як бачить ${esc(d.name)}</button>`;
 }
 let pamt = null, histOpen = false;
+// екран підтвердження (замість «натисни ще раз»): confirmBox = {title, text, withWhy, onYes}
+let confirmBox = null;
+function confirmHTML(c) {
+  return `<div class="modal" data-act="cno"><section class="card" data-act="noop"><h2>${esc(c.title)}</h2>${c.text?`<div class="sub">${esc(c.text)}</div>`:''}${c.withWhy?`<textarea class="why" id="cwhy" placeholder="${esc(c.withWhy)}"></textarea>`:''}<button class="cta" data-act="cyes">${esc(c.yes||'Так')}</button><button class="ghost" data-act="cno">Скасувати</button></section></div>`;
+}
 function syncBack() {
   if (!tg || !tg.BackButton) return;
-  const show = reviewMode || histOpen || preview;
+  const show = reviewMode || histOpen || preview || !!confirmBox;
   if (show) tg.BackButton.show(); else tg.BackButton.hide();
 }
-if (tg && tg.BackButton) tg.BackButton.onClick(() => { if (histOpen) histOpen = false; else if (preview) preview = false; else if (reviewMode) { reviewMode = false; reviewWeek = ''; } render(state); window.scrollTo(0,0); });
+if (tg && tg.BackButton) tg.BackButton.onClick(() => { if (confirmBox) confirmBox = null; else if (histOpen) histOpen = false; else if (preview) preview = false; else if (reviewMode) { reviewMode = false; reviewWeek = ''; } render(state); window.scrollTo(0,0); });
 function render(j) {
   syncBack();
   const app = document.getElementById('app');
   if (j.error) { app.innerHTML = `<div class="err">${esc(j.error)}</div>`; return; }
   const t = toast ? `<div class="err">${esc(toast)}</div>` : ''; toast = '';
-  const h = histOpen ? historyModal((j.role === 'parent' ? j.detail.history : j.history) || []) : '';
+  const h = (histOpen ? historyModal((j.role === 'parent' ? j.detail.history : j.history) || []) : '') + (confirmBox ? confirmHTML(confirmBox) : '');
   app.innerHTML = t + (j.role === 'parent' ? parentHTML(j) : (j.note ? `<div class="note">${esc(j.note)}</div>` : '') + kidHTML(j, 'kid')) + h;
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
   const a = b.dataset.act, v = b.dataset.v;
+  if (a==='noop') return; // клік усередині картки модалки — нічого
   // кнопки без запиту на сервер працюють завжди, навіть поки чекаємо відповіді
-  const uiOnly = ['hist','histclose','fixopen','pamt','tmode','copen','preview','review','ntype'];
+  const uiOnly = ['hist','histclose','fixopen','pamt','tmode','copen','preview','review','ntype','fixreq','papprove','pcancel','cno'];
   if (busy && !uiOnly.includes(a)) return;
   if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
   if (a==='day') { date = v; call('app_state'); }
@@ -368,7 +374,9 @@ document.addEventListener('click', e => {
   if (a==='wake') call('app_wake');
   if (a==='hw') call('app_hw', {ok: v!=='0'});
   if (a==='screen') call('app_screen', {ok: v==='1'});
-  if (a==='fixreq') { if (b.dataset.confirm) call('app_fixreq', {habit: b.dataset.h, date: b.dataset.d}); else { b.dataset.confirm = '1'; b.textContent = 'Натисни ще раз — попросити батьків зарахувати'; } }
+  if (a==='fixreq') { const it = state.items.find(x=>x.k===b.dataset.h); confirmBox = {title: 'Попросити батьків виправити?', text: `${it?it.t:''} за ${shortD(b.dataset.d)} — батьки отримають запит і вирішать.`, withWhy: 'Чому? Наприклад: «я встав вчасно, але забув натиснути»', yes: 'Надіслати', onYes: () => call('app_fixreq', {habit: b.dataset.h, date: b.dataset.d, why: (document.getElementById('cwhy')||{}).value||''})}; render(state); }
+  if (a==='cyes') { const c = confirmBox; confirmBox = null; if (c && c.onYes) c.onYes(); else render(state); }
+  if (a==='cno') { confirmBox = null; render(state); }
   if (a==='note') { const t = document.getElementById('note').value; if (t.trim().length > 1) call('app_note', {text: t}); }
   if (a==='hist') { histOpen = true; render(state); }
   if (a==='histclose') { histOpen = false; render(state); }
@@ -379,14 +387,14 @@ document.addEventListener('click', e => {
   if (a==='pnews') call('app_p_news', {id:b.dataset.id, ok: v==='1', amount: Number(b.dataset.amt||0), kudos: !!b.dataset.kudos});
   if (a==='pamt') { pamt = Number(v); document.querySelectorAll('[data-act=pamt]').forEach(x=>x.setAttribute('aria-pressed', x===b)); }
   if (a==='psave') { const my = (state.detail.praise||{})[state.pkey]||{}, why = document.getElementById('why').value; drafts[state.detail.kid] = why; call('app_p_praise', {amt: pamt ?? (my.amt||0), why}); }
-  if (a==='papprove') { if (b.dataset.confirm) call('app_p_approve'); else { b.dataset.confirm = '1'; b.textContent = 'Натисніть ще раз, щоб підтвердити'; } }
+  if (a==='papprove') { const w = state.detail.week; confirmBox = {title: `Підтвердити тиждень · ${uah(w.total)}?`, text: `Гроші підуть у скарбничку ${state.detail.name}, він отримає лист. Після цього змінити відмітки й похвалу вже не можна.`, yes: 'Підтвердити', onYes: () => call('app_p_approve')}; render(state); }
   if (a==='task') call('app_task_'+b.dataset.a, {id: b.dataset.id});
   if (a==='copen') { creditOpen = creditOpen === v ? '' : v; render(state); }
   if (a==='ptask') call('app_p_task_ok', {claim: b.dataset.id, ok: v==='1', how: b.dataset.how, share: Number(b.dataset.share||1)});
   if (a==='pflex') call('app_p_habit_day', {habit: b.dataset.h, on: v==='1'});
   if (a==='tmode') { tmode = v; document.querySelectorAll('[data-act=tmode]').forEach(x=>x.setAttribute('aria-pressed', x===b)); }
   if (a==='pcredit') { creditOpen = ''; call('app_p_task_credit', {id: b.dataset.id, kid: b.dataset.kid, share: Number(b.dataset.share||1)}); }
-  if (a==='pcancel') { if (b.dataset.confirm) call('app_p_task_cancel', {id: b.dataset.id}); else { b.dataset.confirm = '1'; b.textContent = 'Точно?'; } }
+  if (a==='pcancel') { confirmBox = {title: 'Скасувати завдання?', text: 'Діти його більше не побачать.', yes: 'Скасувати завдання', onYes: () => call('app_p_task_cancel', {id: b.dataset.id})}; render(state); }
   if (a==='pprice') call('app_p_chore_price', {id: b.dataset.id, price: Number(document.querySelector(`[data-cprice="${b.dataset.id}"]`).value)});
   if (a==='ppost') { const sel = document.getElementById('tsel'); call('app_p_task_post', {chore: sel.value || null, title: document.getElementById('ttitle').value, price: Number(document.getElementById('tprice').value), save: document.getElementById('tsave').checked, mode: tmode}); }
   if (a==='preview') { preview = v==='1'; render(state); window.scrollTo(0,0); }
