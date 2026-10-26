@@ -77,6 +77,16 @@ textarea.why{font:inherit;color:var(--ink);background:var(--bg);border:1px solid
 .pr{border-left:3px solid var(--line);padding:6px 10px;margin:4px 0;font-size:14px}.pr b{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}.pr.kid{border-color:var(--accent)}
 .stat{font-size:14px;font-weight:700}.stat.ok{color:var(--accent)}.stat.no{color:var(--bad)}
 details summary{cursor:pointer;color:var(--muted);font-size:14px}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--card);border-radius:14px;padding:12px 16px;font:700 15px var(--f-b);text-align:center;z-index:8;box-shadow:0 6px 24px rgba(0,0,0,.25);animation:toastin .25s ease-out}
+@keyframes toastin{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}
+.fire{display:inline-block;margin-left:6px;font:700 12px var(--f-m);color:#C2462F}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.badge{border-radius:14px;padding:10px 6px;text-align:center;background:var(--bg);font-size:11.5px;color:var(--muted);line-height:1.25}
+.badge i{display:block;font-style:normal;font-size:26px;margin-bottom:4px}.badge b{display:block;color:var(--ink);font-size:12px}
+.badge.on{background:var(--coin-soft)}.badge.off i{filter:grayscale(1);opacity:.45}
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:7;overflow:hidden}
+.confetti i{position:absolute;top:-12px;width:9px;height:14px;border-radius:2px;animation:fall 2.6s linear forwards}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg);opacity:.9}}
 .grid{display:grid;grid-template-columns:minmax(0,1fr) repeat(7,30px);gap:3px;align-items:center;font-size:12.5px}
 .grid .hd{font-family:var(--f-m);font-size:10px;color:var(--muted);text-align:center}
 .grid .nm{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding-right:4px}
@@ -105,7 +115,7 @@ let toast = ''; // коротке повідомлення над екраном
 let diag = null;  // що сталося з попереднім обірваним запитом — сервер запише в лог
 const drafts = {}; // чернетки похвали за дитиною: не губляться, якщо збереження не пройшло
 // дії, які безпечно повторити (результат той самий, скільки разів не надішли)
-const BUILD = '24'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
+const BUILD = '25'; // має збігатися з ?v= у fb_config.app_url; інакше сторінка сама перезавантажиться
 const SAFE = new Set(['app_state','app_p_praise','app_p_toggle','app_toggle','app_screen','app_p_news','app_p_chore_price','app_p_task_ok','app_p_habit_day','app_p_task_credit']);
 let lastAction = '';
 async function call(action, extra={}) {
@@ -140,7 +150,7 @@ async function call(action, extra={}) {
   state = j; if (!date) date = j.role==='parent' ? j.detail.date : j.date;
   taskNote = j.role === 'parent' && /^app_p_(task|chore)/.test(lastAction) ? (j.note || '') : '';
   praiseNote = j.role === 'parent' && lastAction === 'app_p_praise' ? (j.note || '') : '';
-  if (j.role === 'parent') { const my = (j.detail.praise||{})[j.pkey]; if (my && drafts[j.detail.kid] === my.why) delete drafts[j.detail.kid]; }
+  if (j.role === 'parent' && lastAction === 'app_p_praise' && /збережено/i.test(j.note||'')) { delete drafts[j.detail.kid]; pamt = null; }
   render(j);
   if (HASH && !scrolledOnce) { scrolledOnce = true; const el = document.getElementById('blk-' + HASH); if (el) { if (el.tagName === 'DETAILS') el.open = true; el.scrollIntoView({block:'start'}); } }
 }
@@ -152,10 +162,10 @@ function goalCard(k) {
   const tot = p.total ?? p.bal, pct = Math.min(100, tot/p.goal*100), left = Math.max(0, p.goal - tot);
   const eta = left===0 ? 'Ціль досягнута! 🎉' : p.avg > 0 ? '≈ '+Math.ceil(left/p.avg)+' тиж.' : '';
   return `<section class="card" style="gap:6px"><div class="lbl">💰 Скарбничка · збираю на ${esc(p.goal_name||'ціль')}</div><div class="big" style="font-size:34px;line-height:1.1">${uah(p.bal)}</div>
-  <div class="bar"><i style="width:${pct}%"></i></div>
+  <div class="bar"><i style="width:${pct}%"></i>${(() => { const st = p.step || 5000, m = []; if (p.goal/st <= 12) for (let v = st; v < p.goal; v += st) m.push(`<s style="left:${v/p.goal*100}%"></s>`); return m.join(''); })()}</div>
   <div class="row muted" style="font-size:13px"><span>${p.promised?`твої ${uah(p.bal)} + батьки ${uah(p.promised)} = `:''}${uah(tot)} з ${uah(p.goal)}</span><span>${eta}</span></div></section>`;
 }
-const rw = it => it.reward != null ? `<span class="rw">+${it.reward} ₴</span>` : '';
+const rw = it => (it.reward != null ? `<span class="rw">+${it.reward} ₴</span>` : '') + (it.streak >= 2 ? `<span class="fire">🔥${it.streak}</span>` : '');
 const two = (act, h, done, dis, yes='✅ Виконав', no='❌ Не виконав') => `<span class="pick"><button data-act="${act}" data-h="${h}" data-v="1" aria-pressed="${done===true}"${dis}>${yes}</button><button data-act="${act}" data-h="${h}" data-v="0" aria-pressed="${done===false}"${dis}>${no}</button></span>`;
 const box = it => `<span class="box">${it.done === true ? '✓' : it.done === false ? '✕' : (ICON[it.type] || '')}</span>`;
 const cls = it => it.done === true ? 'ok' : it.done === false ? 'no' : '';
@@ -219,9 +229,10 @@ function tasksCard(k, view) {
 // 👍 Похвала — обом; у дитини ще «💬 Сказати батькам»
 const PNAME = {mom:'Мама', dad:'Тато'};
 const NOTE_Q = 'Що хочеш сказати мамі й татові? Можна подякувати, попросити про щось або розповісти, що цього тижня було важко чи приємно.';
-function praiseBlock(pr, notes) {
+function praiseBlock(pr, notes, praises) {
   const L = [];
-  for (const k of ['mom','dad']) if (pr && pr[k] && pr[k].why) L.push(`<div class="pr"><b>${PNAME[k]} · +${pr[k].amt} ₴</b>${esc(pr[k].why)}</div>`);
+  if (praises && praises.length) for (const p of praises) L.push(`<div class="pr"><b>${PNAME[p.pkey]||p.pkey}${p.amt?' · +'+p.amt+' ₴':''}${p.at?' · '+shortD(p.at):''}</b>${esc(p.why)}</div>`);
+  else for (const k of ['mom','dad']) if (pr && pr[k] && pr[k].why) L.push(`<div class="pr"><b>${PNAME[k]} · +${pr[k].amt} ₴</b>${esc(pr[k].why)}</div>`);
   for (const n of notes||[]) L.push(`<div class="pr kid"><b>💬 ${esc(n.at ? shortD(n.at) : '')}</b>${esc(n.text)}</div>`);
   return L.join('');
 }
@@ -237,8 +248,13 @@ function newsCardKid(k, view) {
     ${newsType ? `<div class="sub">${NEWS_Q[newsType]}</div><textarea class="why" id="newstext" placeholder="Напиши тут…"${view?' disabled':''}></textarea><button class="ghost" data-act="news"${view?' disabled':''}>Надіслати батькам</button>` : ''}
     ${list}</section>`;
 }
+function badgesCard(k) {
+  const B = k.badges || []; if (!B.length) return '';
+  const got = B.filter(b=>b.earned).length;
+  return `<section class="card" id="blk-badges"><div class="row"><h2>🏅 Досягнення</h2><span class="sub">${got} з ${B.length}</span></div><div class="badges">${B.map(b=>`<div class="badge ${b.earned?'on':'off'}"><i>${b.icon}</i><b>${esc(b.t)}</b>${b.earned?(b.at?shortD(b.at):'є'):esc(b.hint)}</div>`).join('')}</div></section>`;
+}
 function praiseCardKid(k, view) {
-  const body = praiseBlock(k.praise, k.notes) || '<div class="sub">Цього тижня похвали ще немає</div>';
+  const body = praiseBlock(k.praise, k.notes, k.praises) || '<div class="sub">Цього тижня похвали ще немає</div>';
   const hist = (k.history||[]).length ? `<button class="ghost" data-act="hist">Історія · ${k.history.length} тижн.</button>` : '';
   return `<section class="card" id="blk-praise"><h2>👍 Похвала</h2>${body}
     <details><summary>💬 Сказати батькам</summary><div class="sub" style="margin:6px 0">${NOTE_Q}</div><textarea class="why" id="note" placeholder="Напиши тут…"${view?' disabled':''}></textarea><button class="ghost" data-act="note"${view?' disabled':''}>Надіслати</button></details>${hist}</section>`;
@@ -248,16 +264,15 @@ function praiseCardParent(j) {
   const other = Object.keys(PNAME).find(k => k !== j.pkey), oth = (d.praise||{})[other];
   const hist = (d.history||[]).length ? `<button class="ghost" data-act="hist">Історія · ${d.history.length} тижн.</button>` : '';
   // підтверджений тиждень — лише читання: обидві похвали й листи дитини як текст
-  if (w.approved) return `<section class="card" id="blk-praise"><div class="row"><h2>👍 Похвала</h2><span class="sub">🔒 тиждень підтверджено</span></div>${praiseBlock(d.praise, d.notes) || '<div class="sub">Похвали за цей тиждень не було</div>'}<div class="sub">Нову похвалу можна написати за поточний тиждень — виберіть сьогоднішній день.</div>${hist}</section>`;
+  if (w.approved) return `<section class="card" id="blk-praise"><div class="row"><h2>👍 Похвала</h2><span class="sub">🔒 тиждень підтверджено</span></div>${praiseBlock(d.praise, d.notes, d.praises) || '<div class="sub">Похвали за цей тиждень не було</div>'}<div class="sub">Нову похвалу можна написати за поточний тиждень — виберіть сьогоднішній день.</div>${hist}</section>`;
   return `<section class="card" id="blk-praise"><div class="row"><h2>👍 Похвала</h2><span class="sub">до ${pr} ₴ від кожного</span></div>
-    ${oth && oth.why ? `<div class="pr"><b>${PNAME[other]} · +${oth.amt} ₴</b>${esc(oth.why)}</div>` : ''}
-    ${praiseBlock(null, d.notes)}
-    <div class="chips">${[0,Math.round(pr/2),pr].map(v=>`<button data-act="pamt" data-v="${v}" aria-pressed="${(pamt ?? my.amt ?? 0)===v}" ${w.approved?'disabled':''}>${v} ₴</button>`).join('')}</div>
-    <textarea class="why" id="why" placeholder="За що саме? Конкретна дія — ${esc(d.name)} це прочитає" ${w.approved?'disabled':''}>${esc(drafts[d.kid] ?? my.why ?? '')}</textarea>
+    ${praiseBlock(d.praise, d.notes, d.praises)}
+    ${(() => { const used = (d.praises||[]).filter(p=>p.pkey===j.pkey).reduce((a,p)=>a+(p.amt||0),0), left = Math.max(0, pr - used); return `<div class="sub">Хвалити можна скільки завгодно — кожна похвала одразу йде ${esc(d.name)}. Гроші цього тижня від вас: ще до ${left} ₴.</div><div class="chips">${[0,Math.min(left,Math.round(pr/2)),left].filter((v,i,a)=>a.indexOf(v)===i).map(v=>`<button data-act="pamt" data-v="${v}" aria-pressed="${(pamt ?? 0)===v}">${v} ₴</button>`).join('')}</div>`; })()}
+    <textarea class="why" id="why" placeholder="За що саме? Конкретна дія — ${esc(d.name)} це прочитає">${esc(drafts[d.kid] ?? '')}</textarea>
     ${w.approved?'':'<button class="ghost" data-act="psave">Зберегти похвалу</button>'}${praiseNote?`<div class="note">${praiseNote.startsWith('Похвалу збережено')?'✅ Збережено. '+esc(d.name)+' отримав повідомлення.':esc(praiseNote)}</div>`:''}${hist}</section>`;
 }
 function historyModal(h) {
-  const weeks = h.map(x=>`<div><div class="lbl" style="margin-top:8px">${shortD(x.week)} – ${shortD(addD(x.week,6))}</div>${praiseBlock({mom:x.mom, dad:x.dad}, x.notes)}</div>`).join('');
+  const weeks = h.map(x=>`<div><div class="lbl" style="margin-top:8px">${shortD(x.week)} – ${shortD(addD(x.week,6))}</div>${praiseBlock({mom:x.mom, dad:x.dad}, x.notes, x.praises)}</div>`).join('');
   return `<div class="modal" data-act="histclose"><section class="card" data-act="noop"><div class="row"><h2>👍 Історія похвали</h2><button class="fix" data-act="histclose">Закрити</button></div>${weeks || '<div class="sub">Поки порожньо</div>'}</section></div>`;
 }
 // 📊 Тиждень — коротко, деталі згорнуті
@@ -273,7 +288,7 @@ function weekCard(k) {
 function kidHTML(k, mode) {
   const yday = addD(k.today, -1);
   const seg = mode==='kid' ? `<div class="seg"><button data-act="day" data-v="${k.today}" aria-pressed="${date===k.today}">Сьогодні</button><button data-act="day" data-v="${yday}" aria-pressed="${date===yday}">Вчора</button></div>` : '';
-  return `<div class="lbl" style="padding:0 4px">Твій день · ${esc(k.name)}</div>` + goalCard(k) + seg + habitsCard(k, mode) + tasksCard(k, mode==='view') + newsCardKid(k, mode==='view') + praiseCardKid(k, mode==='view') + weekCard(k);
+  return `<div class="lbl" style="padding:0 4px">Твій день · ${esc(k.name)}</div>` + goalCard(k) + seg + habitsCard(k, mode) + tasksCard(k, mode==='view') + newsCardKid(k, mode==='view') + praiseCardKid(k, mode==='view') + badgesCard(k) + weekCard(k);
 }
 // 🧹 Задачі — батьки: «чекають рішення» (хто натиснув) і «відкриті» (ніхто не натискав); частка — біля конкретної задачі
 const SHARE_L = {1:'100%', 0.75:'¾', 0.5:'½', 0.25:'¼'};
@@ -353,13 +368,27 @@ function syncBack() {
   if (show) tg.BackButton.show(); else tg.BackButton.hide();
 }
 if (tg && tg.BackButton) tg.BackButton.onClick(() => { if (confirmBox) confirmBox = null; else if (histOpen) histOpen = false; else if (preview) preview = false; else if (reviewMode) { reviewMode = false; reviewWeek = ''; } render(state); window.scrollTo(0,0); });
+function showToast(text) {
+  const old = document.querySelector('.toast'); if (old) old.remove();
+  const el = document.createElement('div'); el.className = 'toast'; el.textContent = text; document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+function confetti() {
+  const c = document.createElement('div'); c.className = 'confetti';
+  const cols = ['#0B7F62','#E0A21B','#C2462F','#2F6FD6','#8E44AD'];
+  for (let i = 0; i < 70; i++) { const p = document.createElement('i'); p.style.left = Math.random()*100+'%'; p.style.background = cols[i%cols.length]; p.style.animationDelay = (Math.random()*0.8)+'s'; p.style.transform = `rotate(${Math.random()*360}deg)`; c.appendChild(p); }
+  document.body.appendChild(c); setTimeout(() => c.remove(), 3600);
+}
 function render(j) {
   syncBack();
   const app = document.getElementById('app');
   if (j.error) { app.innerHTML = `<div class="err">${esc(j.error)}</div>`; return; }
   const t = toast ? `<div class="err">${esc(toast)}</div>` : ''; toast = '';
   const h = (histOpen ? historyModal((j.role === 'parent' ? j.detail.history : j.history) || []) : '') + (confirmBox ? confirmHTML(confirmBox) : '');
-  app.innerHTML = t + (j.role === 'parent' ? parentHTML(j) : (j.note ? `<div class="note">${esc(j.note)}</div>` : '') + kidHTML(j, 'kid')) + h;
+  app.innerHTML = t + (j.role === 'parent' ? parentHTML(j) : kidHTML(j, 'kid')) + h;
+  if (j.role !== 'parent' && j.note && lastAction !== 'app_state') showToast(j.note);
+  // віха цілі: перетнули наступні 5 000 ₴ — конфеті один раз
+  if (j.role !== 'parent' && j.piggy && j.piggy.goal) { const st = j.piggy.step || 5000, m = Math.floor((j.piggy.total||0)/st); let seen = -1; try { seen = Number(localStorage.getItem('ms_'+j.kid) ?? -1); if (m > seen && seen >= 0) { confetti(); showToast(`🎉 ${uah(m*st)} до «${j.piggy.goal_name}» — ${Math.round(m*st/j.piggy.goal*100)}% шляху!`); } localStorage.setItem('ms_'+j.kid, String(m)); } catch(e) {} }
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
@@ -386,7 +415,7 @@ document.addEventListener('click', e => {
   if (a==='pset') { fixOpen.delete(b.dataset.h); call('app_p_toggle', {habit:b.dataset.h, ok: v==='1'}); }
   if (a==='pnews') call('app_p_news', {id:b.dataset.id, ok: v==='1', amount: Number(b.dataset.amt||0), kudos: !!b.dataset.kudos});
   if (a==='pamt') { pamt = Number(v); document.querySelectorAll('[data-act=pamt]').forEach(x=>x.setAttribute('aria-pressed', x===b)); }
-  if (a==='psave') { const my = (state.detail.praise||{})[state.pkey]||{}, why = document.getElementById('why').value; drafts[state.detail.kid] = why; call('app_p_praise', {amt: pamt ?? (my.amt||0), why}); }
+  if (a==='psave') { const why = document.getElementById('why').value; drafts[state.detail.kid] = why; call('app_p_praise', {amt: pamt ?? 0, why}); }
   if (a==='papprove') { const w = state.detail.week; confirmBox = {title: `Підтвердити тиждень · ${uah(w.total)}?`, text: `Гроші підуть у скарбничку ${state.detail.name}, він отримає лист. Після цього змінити відмітки й похвалу вже не можна.`, yes: 'Підтвердити', onYes: () => call('app_p_approve')}; render(state); }
   if (a==='task') call('app_task_'+b.dataset.a, {id: b.dataset.id});
   if (a==='copen') { creditOpen = creditOpen === v ? '' : v; render(state); }
